@@ -856,3 +856,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tracks-scroll.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
 .tracks-more { margin-left: auto; font-size: 10px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--accent); }
 .tracks-scroll > .track-row { flex-shrink: 0; }
+
+/* empty space in a day is clickable to add */
+.day { cursor: copy; }
+.day .card, .day button, .day input, .day .day-head, .tracks-dock { cursor: default; }
+.day .card { cursor: grab; }
+.day:hover .add-row { opacity: 1; }
+.tracks-label { white-space: nowrap; overflow: hidden; }
+.tracks-more { flex-shrink: 0; }

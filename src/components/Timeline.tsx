@@ -207,7 +207,10 @@ export function Timeline({ today }: { today: ISODate }) {
   // the page is just tall enough for the longest day plus that section
   const tallest = Math.ceil(Math.max(0, ...cols.map((d) => regH[d] ?? 0)));
   // at most MAX_TRACK_ROWS rows are visible; the rest scroll inside the strip (all days together)
-  const tracksCapH = trackRows.slice(0, MAX_TRACK_ROWS).reduce((s, r) => s + r.h + 6, 0);
+  // cap by cards, not rows: a project with 3 steps on one day makes a 3-card row
+  const allTrackH = trackRows.reduce((s, r) => s + r.h + 6, 0);
+  const tracksCapH = Math.min(allTrackH, MAX_TRACK_CARDS * (TRACK_CARD_H + 6));
+  const totalCards = trackRows.reduce((s, r) => s + Math.round((r.h + 4) / (TRACK_CARD_H + 4)), 0);
   const tracksH = trackRows.length ? 32 + (tracksCollapsed ? 0 : tracksCapH) : 0;
   const pageH = Math.max(vh, (HEAD_H + tallest + tracksH + 40) * tz);
 
@@ -225,7 +228,7 @@ export function Timeline({ today }: { today: ISODate }) {
             trackRows={trackRows}
             collapsed={tracksCollapsed}
             capH={tracksCapH}
-            hiddenRows={Math.max(0, trackRows.length - MAX_TRACK_ROWS)}
+            hiddenRows={Math.max(0, totalCards - MAX_TRACK_CARDS)}
             tz={tz}
             onMeasure={report}
             projects={idx.projects}
@@ -242,7 +245,7 @@ export function Timeline({ today }: { today: ISODate }) {
 }
 
 const HEAD_H = 38;
-const MAX_TRACK_ROWS = 3;
+const MAX_TRACK_CARDS = 3;
 
 // Every day has its own copy of the strip; keep them scrolled to the same row so they stay aligned.
 let trackScrollTop = 0;
@@ -301,6 +304,7 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
     return () => ro.disconnect();
   }, [date, tz, onMeasure]);
   const [adding, setAdding] = useState(false);
+  const busyBeforeClick = useRef(false);
   const d = fromISO(date);
   const wd = weekday(date);
   const isToday = date === today;
@@ -318,6 +322,13 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
 
   return (
     <section
+      onMouseDownCapture={() => (busyBeforeClick.current = !!S().ui.selectedId || !!S().ui.multi?.length || adding)}
+      onClick={(e) => {
+        // empty space only — not cards, buttons, inputs, the header or the projects strip
+        if (busyBeforeClick.current) return; // first click just closes the open task / selection
+        if (e.target instanceof Element && e.target.closest('[data-card], button, input, textarea, select, .day-head, .tracks-dock, .menu')) return;
+        setAdding(true);
+      }}
       className={cls('day', isToday && 'today', date < today && 'past', (wd === 0 || wd === 6) && 'weekend', d.getDate() === 1 && 'month-start')}
       style={{ left, width }}
       onDragOver={(e) => {
@@ -350,7 +361,7 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
         </div>
       </header>
       <div className="day-body">
-      <div className="day-list" ref={listRef} onDoubleClick={(e) => e.target === e.currentTarget && setAdding(true)}>
+      <div className="day-list" ref={listRef}>
         {items.map((it, i) => (
           <div key={it.key} className={cls('slot', dropIndex === i && 'drop-before')}>
             <ItemCard item={it} today={today} project={it.kind !== 'follow' && it.task.projectId ? projects[it.task.projectId] : undefined} />
@@ -369,7 +380,7 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
           <button className="tracks-label" onClick={() => S().setSettings({ tracksCollapsed: !collapsed })} title={collapsed ? 'Show projects & series' : 'Hide to see more of each day'}>
             {collapsed ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Projects &amp; series
             {collapsed && <span className="tracks-count">{[...tracks.values()].flat().length || ''}</span>}
-            {!collapsed && hiddenRows > 0 && <span className="tracks-more">+{hiddenRows} more · scroll</span>}
+            {!collapsed && hiddenRows > 0 && <span className="tracks-more" title="Scroll this strip to see the rest">+{hiddenRows} ↓</span>}
           </button>
           {!collapsed && (
             <div className={cls('tracks-scroll', hiddenRows > 0 && 'has-more')} style={{ maxHeight: capH }} ref={syncTrackScroll} onScroll={onTrackScroll}>
