@@ -111,6 +111,8 @@ export interface Settings {
   alertLevels?: { minutes: number; on: boolean }[];
   alertsCollapsed?: boolean;
   tracksCollapsed?: boolean;
+  /** sticky folded into a thin strip on the left of the Days view */
+  stickyCollapsed?: boolean;
   defaultImportance: Importance;
   llmEnabled: boolean;
   /** OpenAI-compatible base URL, e.g. http://localhost:11434/v1 (Ollama) or http://localhost:1234/v1 (LM Studio) */

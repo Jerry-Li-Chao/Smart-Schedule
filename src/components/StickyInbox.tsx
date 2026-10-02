@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { GitBranch, Lightbulb, Sparkles, StickyNote, X } from 'lucide-react';
+import { ChevronsLeft, GitBranch, Lightbulb, Sparkles, StickyNote, X } from 'lucide-react';
 import type { ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, nextMonday, weekendOf } from '../lib/date';
@@ -16,7 +16,9 @@ function age(ms: number) {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function StickyInbox({ today }: { today: ISODate }) {
+/** `collapsible`: the Days view can fold it into a thin strip on the left. */
+export function StickyInbox({ today, collapsible }: { today: ISODate; collapsible?: boolean }) {
+  const collapsed = useStore((s) => !!collapsible && !!s.settings.stickyCollapsed);
   const entities = useStore((s) => s.entities);
   const { inbox, someday } = useMemo(() => {
     const all = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
@@ -34,32 +36,43 @@ export function StickyInbox({ today }: { today: ISODate }) {
     setV('');
   };
 
+  const drop = {
+    onDragOver: (e: React.DragEvent) => {
+      if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+      e.preventDefault();
+      setOver(true);
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setOver(false);
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setOver(false);
+      const p = JSON.parse(e.dataTransfer.getData(DRAG_MIME) || '{}');
+      if (p.kind !== 'task') {
+        if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
+        return;
+      }
+      const t = getTask(p.id);
+      if (!t || (t.date === null && !t.someday)) return;
+      if (t.recurrence) return S().toast('Repeating tasks stay on the calendar.');
+      updateTask(t.id, { date: null, someday: false }, `Put “${t.title}” back on the sticky`);
+      S().toast(t.projectId ? `Unscheduled “${t.title}” — it’s waiting in its project` : `“${t.title}” is back on the sticky`, [{ label: 'Undo', run: () => S().undo() }]);
+    },
+  };
+  const setCollapsed = (c: boolean) => S().setSettings({ stickyCollapsed: c });
+
+  if (collapsed)
+    return (
+      <aside className={cls('sticky-rail', over && 'drop-over')} {...drop} onClick={() => setCollapsed(false)} title="Show the sticky">
+        <StickyNote size={15} />
+        {inbox.length > 0 && <span className="count">{inbox.length}</span>}
+        <span className="sr-label">Sticky</span>
+      </aside>
+    );
+
   return (
-    <aside
-      className={cls('sticky', over && 'drop-over')}
-      onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-        e.preventDefault();
-        setOver(true);
-      }}
-      onDragLeave={(e) => {
-        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setOver(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setOver(false);
-        const p = JSON.parse(e.dataTransfer.getData(DRAG_MIME) || '{}');
-        if (p.kind !== 'task') {
-          if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
-          return;
-        }
-        const t = getTask(p.id);
-        if (!t || (t.date === null && !t.someday)) return;
-        if (t.recurrence) return S().toast('Repeating tasks stay on the calendar.');
-        updateTask(t.id, { date: null, someday: false }, `Put “${t.title}” back on the sticky`);
-        S().toast(t.projectId ? `Unscheduled “${t.title}” — it’s waiting in its project` : `“${t.title}” is back on the sticky`, [{ label: 'Undo', run: () => S().undo() }]);
-      }}
-    >
+    <aside className={cls('sticky', over && 'drop-over')} {...drop}>
       {over && <div className="drop-hint">Drop to unschedule — back on the sticky</div>}
       <div className="sticky-head">
         <StickyNote size={15} />
@@ -69,6 +82,11 @@ export function StickyInbox({ today }: { today: ISODate }) {
         {inbox.length > 0 && (
           <button className="btn tiny plan-btn" onClick={() => S().setUI({ planOpen: true })}>
             <Sparkles size={12} /> Plan them
+          </button>
+        )}
+        {collapsible && (
+          <button className="icon-btn" title="Fold the sticky away (you can still drop tasks on it)" onClick={() => setCollapsed(true)}>
+            <ChevronsLeft size={15} />
           </button>
         )}
       </div>

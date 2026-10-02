@@ -1,0 +1,55 @@
+import { describe, expect, it } from 'vitest';
+import { computeStats, periodRange } from './achievements';
+import type { Entity, Task } from '../types';
+
+const T = (p: Partial<Task>): Task => ({
+  id: p.id ?? Math.random().toString(36).slice(2),
+  type: 'task',
+  title: 'x',
+  date: null,
+  importance: 'should',
+  status: 'open',
+  order: 0,
+  createdAt: 0,
+  updatedAt: 0,
+  ...p,
+});
+const db = (...ts: Task[]): Record<string, Entity> => Object.fromEntries(ts.map((t) => [t.id, t]));
+const at = (d: string, h = 9) => new Date(`${d}T${String(h).padStart(2, '0')}:00:00`).getTime();
+
+describe('achievements', () => {
+  const today = '2026-10-02'; // a Friday
+
+  it('picks the right ranges', () => {
+    expect(periodRange('week', today)).toMatchObject({ from: '2026-09-28', to: today, prevFrom: '2026-09-21', prevTo: '2026-09-25' });
+    expect(periodRange('year', today)).toMatchObject({ from: '2026-01-01', prevFrom: '2025-01-01', prevTo: '2025-10-02' });
+  });
+
+  it('counts wins by importance, including days of repeating tasks', () => {
+    const s = computeStats(
+      db(
+        T({ id: 'a', title: 'Call the dentist', importance: 'must', status: 'done', date: '2026-09-30', doneAt: at('2026-09-30') }),
+        T({ id: 'b', importance: 'could', status: 'done', date: '2026-09-29', doneAt: at('2026-09-29') }),
+        T({ id: 'old', status: 'done', date: '2026-09-22', doneAt: at('2026-09-22') }),
+        T({ id: 'open', importance: 'must', date: '2026-09-29', firstScheduled: '2026-09-25' }),
+        T({ id: 'r', title: 'Spanish L#', date: '2026-09-28', recurrence: { freq: 'daily', interval: 1 }, completions: { '2026-09-28': 'done', '2026-09-29': 'done', '2026-09-30': 'deleted' } }),
+      ),
+      'week',
+      today,
+    );
+    expect(s.wins.length).toBe(4);
+    expect(s.byLevel).toEqual({ must: 1, should: 2, could: 1 });
+    expect(s.prevTotal).toBe(1);
+    expect(s.longestStreak).toBe(3); // Mon–Wed
+    expect(s.currentStreak).toBe(0);
+    expect(s.habits[0]).toMatchObject({ title: 'Spanish L#', done: 2, scheduled: 4 }); // 28, 29, 1, 2 (30 deleted)
+    expect(s.left.overdue.map((t) => t.id)).toEqual(['open']);
+    expect(s.left.byLevel.must).toBe(1);
+  });
+
+  it('finds the comeback task', () => {
+    const s = computeStats(db(T({ title: 'Renew passport', status: 'done', firstScheduled: '2026-09-01', date: '2026-10-01', doneAt: at('2026-10-01') })), 'month', today);
+    expect(s.comeback).toMatchObject({ title: 'Renew passport', carried: 30 });
+    expect(s.currentStreak).toBe(1);
+  });
+});

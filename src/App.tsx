@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarDays, CalendarRange, Cloud, CloudOff, GitBranch, History, Loader2, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
+  CalendarDays, CalendarRange, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
 } from 'lucide-react';
 import type { Task } from './types';
 import { S, useStore, type View } from './store';
@@ -20,6 +20,7 @@ import { PlanModal } from './components/PlanModal';
 import { ProjectsView } from './components/Projects';
 import { Upcoming } from './components/Upcoming';
 import { HistoryView } from './components/HistoryView';
+import { Achievements } from './components/Achievements';
 import { SettingsView } from './components/Settings';
 import { ContextMenu } from './components/ItemCard';
 import { DeleteRepeatDialog } from './components/DeleteRepeatDialog';
@@ -42,6 +43,7 @@ const NAV: { view: View; label: string; icon: typeof CalendarDays }[] = [
   { view: 'timeline', label: 'Days', icon: CalendarDays },
   { view: 'projects', label: 'Projects', icon: GitBranch },
   { view: 'upcoming', label: 'Ahead', icon: CalendarRange },
+  { view: 'wins', label: 'Wins', icon: Trophy },
   { view: 'history', label: 'History', icon: History },
   { view: 'settings', label: 'Settings', icon: Cog },
 ];
@@ -50,6 +52,7 @@ const MOBILE_NAV: { view: View; label: string; icon: typeof CalendarDays }[] = [
   { view: 'sticky', label: 'Sticky', icon: StickyNote },
   { view: 'projects', label: 'Projects', icon: GitBranch },
   { view: 'upcoming', label: 'Ahead', icon: CalendarRange },
+  { view: 'wins', label: 'Wins', icon: Trophy },
   { view: 'settings', label: 'More', icon: Cog },
 ];
 
@@ -163,13 +166,14 @@ function Shell() {
         <div className="content">
           {view === 'timeline' && (
             <div className="tl-layout">
-              {!mobile && <StickyInbox today={today} />}
+              {!mobile && <StickyInbox today={today} collapsible />}
               <Timeline today={today} />
             </div>
           )}
           {view === 'sticky' && <StickyInbox today={today} />}
           {view === 'projects' && <ProjectsView today={today} />}
           {view === 'upcoming' && <Upcoming today={today} />}
+          {view === 'wins' && <Achievements today={today} />}
           {view === 'history' && <HistoryView />}
           {view === 'settings' && <SettingsView />}
         </div>
@@ -199,6 +203,7 @@ function Shell() {
 
 function focusSticky() {
   if (S().ui.view !== 'timeline' && S().ui.view !== 'sticky') S().setUI({ view: 'timeline' });
+  if (S().settings.stickyCollapsed) S().setSettings({ stickyCollapsed: false });
   setTimeout(() => (document.querySelector('.sticky-input') as HTMLTextAreaElement | null)?.focus(), 30);
 }
 
@@ -206,7 +211,7 @@ function TopBar({ today, queueLen }: { today: string; queueLen: number }) {
   const view = useStore((s) => s.ui.view);
   const canUndo = useStore((s) => s.undoStack.length > 0);
   const canRedo = useStore((s) => s.redoStack.length > 0);
-  const titles: Record<View, string> = { timeline: '', sticky: 'Sticky', projects: 'Projects & milestones', upcoming: 'Looking ahead', history: 'History', settings: 'Settings' };
+  const titles: Record<View, string> = { timeline: '', sticky: 'Sticky', projects: 'Projects & milestones', upcoming: 'Looking ahead', wins: 'Achievements', history: 'History', settings: 'Settings' };
   return (
     <header className="topbar">
       {view === 'timeline' ? (
