@@ -9,6 +9,7 @@ import { computeStats, LEVELS, PERIOD_LABEL, type Period, type Stats, type Win }
 import { effectiveLevel } from '../lib/priority';
 import { cls } from '../lib/id';
 import { Segmented } from './ui';
+import { TrendChart } from './TrendChart';
 
 const SLIDE_MS = 6500;
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -596,6 +597,8 @@ function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
         <Tile label="Best streak" value={stats.longestStreak} sub={stats.currentStreak ? `${stats.currentStreak} right now` : 'days in a row'} icon={<Flame size={15} />} />
         <Tile label="Active days" value={stats.activeDays} sub={`of ${stats.days.length}`} />
       </div>
+
+      <TrendChart today={today} />
 
       <section className="dash-card">
         <div className="dash-head">

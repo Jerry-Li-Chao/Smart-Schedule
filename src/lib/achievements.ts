@@ -226,3 +226,75 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
     left: { byLevel: leftLevel, overdue, inbox: tasks.filter((t) => t.date === null && !t.someday && !t.projectId && !t.recurrence && !isClosed(t)).length, nextMusts },
   };
 }
+
+// ---------- trend chart ----------
+
+export type TrendRange = '2w' | '1m' | '3m' | '6m' | '1y' | 'all';
+export interface TrendPoint {
+  from: ISODate;
+  to: ISODate;
+  must: number;
+  should: number;
+  could: number;
+  /** planned in this stretch but not done in it (missed repeats, tasks pushed past it, dropped) */
+  left: number;
+}
+
+/**
+ * Completions per importance vs. things left behind, bucketed by day (≤ 1 month),
+ * week (≤ 1 year) or month (all time).
+ */
+export function computeTrend(entities: Record<string, Entity>, range: TrendRange, today: ISODate): { unit: 'day' | 'week' | 'month'; points: TrendPoint[] } {
+  const wins = allWins(entities);
+  const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
+
+  let start: ISODate;
+  if (range === 'all') {
+    const firsts = [...wins.map((w) => w.date), ...tasks.map((t) => t.firstScheduled ?? t.date).filter((d): d is ISODate => !!d && d <= today)];
+    start = firsts.length ? firsts.reduce((a, b) => (a < b ? a : b)) : addDays(today, -29);
+  } else start = addDays(today, -({ '2w': 13, '1m': 29, '3m': 90, '6m': 181, '1y': 364 }[range]));
+  const unit = range === '2w' || range === '1m' ? 'day' : range === 'all' && diffDays(start, today) > 400 ? 'month' : 'week';
+
+  const points: TrendPoint[] = [];
+  let b = unit === 'week' ? startOfWeekMon(start) : unit === 'month' ? `${start.slice(0, 8)}01` : start;
+  while (b <= today) {
+    const next = unit === 'day' ? addDays(b, 1) : unit === 'week' ? addDays(b, 7) : addMonths(b, 1);
+    const end = addDays(next, -1);
+    points.push({ from: b, to: end > today ? today : end, must: 0, should: 0, could: 0, left: 0 });
+    b = next;
+  }
+  const find = (d: ISODate) => {
+    // buckets are sorted; binary search
+    let lo = 0;
+    let hi = points.length - 1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (d < points[m].from) hi = m - 1;
+      else if (d > points[m].to) lo = m + 1;
+      else return points[m];
+    }
+    return undefined;
+  };
+
+  for (const w of wins) {
+    const p = find(w.date);
+    if (p) p[w.importance]++;
+  }
+  // left behind: only judged on days that are over
+  for (const t of tasks) {
+    if (t.recurrence) {
+      if (!t.date) continue;
+      const s0 = t.date > points[0]?.from ? t.date : points[0]?.from;
+      const end = t.recurrence.until && t.recurrence.until < today ? addDays(t.recurrence.until, 1) : today;
+      for (let d = s0; d && d < end; d = addDays(d, 1)) if (occursOn(t.recurrence, t.date, d) && !t.completions?.[d]) find(d) && find(d)!.left++;
+      continue;
+    }
+    const planned = t.firstScheduled ?? t.date;
+    if (!planned || planned >= today || t.someday) continue;
+    const p = find(planned);
+    if (!p) continue;
+    const doneDay = t.status === 'done' ? (t.doneAt && !dayOnly(t) ? toISO(new Date(t.doneAt)) : t.date) : null;
+    if (!doneDay || doneDay > p.to) p.left++;
+  }
+  return { unit, points };
+}

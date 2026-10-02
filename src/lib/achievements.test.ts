@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeStats, periodRange } from './achievements';
+import { computeStats, computeTrend, periodRange } from './achievements';
 import type { Entity, Task } from '../types';
 
 const T = (p: Partial<Task>): Task => ({
@@ -68,5 +68,28 @@ describe('achievements', () => {
     const s = computeStats(db(T({ title: 'Renew passport', status: 'done', firstScheduled: '2026-09-01', date: '2026-10-01', doneAt: at('2026-10-01') })), 'month', today);
     expect(s.comeback).toMatchObject({ title: 'Renew passport', carried: 30 });
     expect(s.currentStreak).toBe(1);
+  });
+});
+
+describe('trend', () => {
+  it('buckets wins by importance and counts what was left behind', () => {
+    const today = '2026-10-02';
+    const tr = computeTrend(
+      db(
+        T({ id: 'a', importance: 'must', status: 'done', date: '2026-10-01', doneAt: new Date('2026-10-01T10:00').getTime() }),
+        T({ id: 'b', importance: 'could', date: '2026-10-02', firstScheduled: '2026-09-30' }), // pushed from 9/30
+        T({ id: 'c', status: 'dropped', date: '2026-09-29' }),
+        T({ id: 'r', date: '2026-09-30', recurrence: { freq: 'daily', interval: 1 }, completions: { '2026-09-30': 'done' } }), // 10/1 missed, today pending
+      ),
+      '2w',
+      today,
+    );
+    expect(tr.unit).toBe('day');
+    expect(tr.points.length).toBe(14);
+    const at = (d: string) => tr.points.find((p) => p.from === d)!;
+    expect(at('2026-10-01')).toMatchObject({ must: 1, left: 1 });
+    expect(at('2026-09-30')).toMatchObject({ should: 1, left: 1 });
+    expect(at('2026-09-29').left).toBe(1);
+    expect(at('2026-10-02').left).toBe(0);
   });
 });
