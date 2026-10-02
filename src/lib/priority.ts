@@ -9,12 +9,6 @@ export const IMPORTANCE_HELP: Record<Importance, { label: string; hint: string }
 
 export const isClosed = (t: Task) => t.status === 'done' || t.status === 'dropped';
 
-/** How many days this task has been pushed forward from its first planned day. */
-export function carriedDays(t: Task): number {
-  if (!t.firstScheduled || !t.date) return 0;
-  return Math.max(0, diffDays(t.firstScheduled, t.date));
-}
-export const isStale = (t: Task) => !isClosed(t) && !t.recurrence && carriedDays(t) >= 3;
 
 /**
  * Importance is what you said; urgency comes from the deadline. The colour shown is
@@ -34,7 +28,6 @@ const W: Record<Importance, number> = { must: 300, should: 200, could: 100 };
 export function score(t: Task, today: ISODate): number {
   let s = W[effectiveLevel(t, today).level];
   if (t.deadline) s += Math.max(0, 14 - diffDays(today, t.deadline)) * 6;
-  s += Math.min(carriedDays(t), 10) * 4;
   if (t.status === 'doing') s += 15;
   if (t.status === 'waiting') s -= 60;
   return s;

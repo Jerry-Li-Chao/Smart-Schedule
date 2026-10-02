@@ -15,8 +15,6 @@ export interface Win {
   /** hour of day it was ticked off (only known for one-off tasks) */
   hour?: number;
   projectId?: string;
-  /** how many days it was pushed before it got done */
-  carried: number;
 }
 
 export interface Habit {
@@ -44,7 +42,6 @@ export interface Stats {
   activeDays: number;
   habits: Habit[];
   projects: { project: Project; steps: number; finished: boolean }[];
-  comeback: Win | null;
   dropped: number;
   left: {
     byLevel: Record<Importance, number>;
@@ -99,7 +96,7 @@ export function allWins(entities: Record<string, Entity>): Win[] {
     if (e.type !== 'task' || e.deleted) continue;
     if (e.recurrence) {
       for (const [d, s] of Object.entries(e.completions ?? {}))
-        if (s === 'done') out.push({ key: `${e.id}|${d}`, title: numberedTitle(e, d), date: d, importance: e.importance, projectId: e.projectId, carried: 0 });
+        if (s === 'done') out.push({ key: `${e.id}|${d}`, title: numberedTitle(e, d), date: d, importance: e.importance, projectId: e.projectId });
     } else if (e.status === 'done') {
       const at = e.doneAt && !dayOnly(e) ? new Date(e.doneAt) : null;
       const date = at ? toISO(at) : e.date;
@@ -111,7 +108,6 @@ export function allWins(entities: Record<string, Entity>): Win[] {
         importance: e.importance,
         hour: at?.getHours(),
         projectId: e.projectId,
-        carried: e.firstScheduled ? Math.max(0, diffDays(e.firstScheduled, date)) : 0,
       });
     }
   }
@@ -188,7 +184,6 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
     .map((p) => ({ ...p, finished: p.project.status === 'done' }))
     .sort((a, b) => b.steps - a.steps);
 
-  const comeback = wins.filter((w) => w.carried >= 3).sort((a, b) => b.carried - a.carried)[0] ?? null;
   const dropped = tasks.filter((t) => !t.recurrence && t.status === 'dropped' && t.date && t.date >= from && t.date <= to).length;
 
   const rank: Record<Importance, number> = { must: 0, should: 1, could: 2 };
@@ -197,7 +192,7 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
   for (const t of open) leftLevel[effectiveLevel(t, today).level]++;
   const overdue = open
     .map((t) => ({ t, l: effectiveLevel(t, today).level }))
-    .sort((a, b) => rank[a.l] - rank[b.l] || (a.t.firstScheduled ?? a.t.date!).localeCompare(b.t.firstScheduled ?? b.t.date!))
+    .sort((a, b) => rank[a.l] - rank[b.l] || a.t.date!.localeCompare(b.t.date!))
     .map((x) => x.t);
   const soon = addDays(today, 7);
   const nextMusts = tasks
@@ -221,7 +216,6 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
     activeDays: Object.keys(perDay).length,
     habits,
     projects,
-    comeback,
     dropped,
     left: { byLevel: leftLevel, overdue, inbox: tasks.filter((t) => t.date === null && !t.someday && !t.projectId && !t.recurrence && !isClosed(t)).length, nextMusts },
   };
@@ -236,7 +230,7 @@ export interface TrendPoint {
   must: number;
   should: number;
   could: number;
-  /** planned in this stretch but not done in it (missed repeats, tasks pushed past it, dropped) */
+  /** planned in this stretch but not done in it (missed repeats, tasks moved past it, dropped) */
   left: number;
 }
 
@@ -250,7 +244,7 @@ export function computeTrend(entities: Record<string, Entity>, range: TrendRange
 
   let start: ISODate;
   if (range === 'all') {
-    const firsts = [...wins.map((w) => w.date), ...tasks.map((t) => t.firstScheduled ?? t.date).filter((d): d is ISODate => !!d && d <= today)];
+    const firsts = [...wins.map((w) => w.date), ...tasks.map((t) => t.date).filter((d): d is ISODate => !!d && d <= today)];
     start = firsts.length ? firsts.reduce((a, b) => (a < b ? a : b)) : addDays(today, -29);
   } else start = addDays(today, -({ '2w': 13, '1m': 29, '3m': 90, '6m': 181, '1y': 364 }[range]));
   const unit = range === '2w' || range === '1m' ? 'day' : range === 'all' && diffDays(start, today) > 400 ? 'month' : 'week';
@@ -289,7 +283,7 @@ export function computeTrend(entities: Record<string, Entity>, range: TrendRange
       for (let d = s0; d && d < end; d = addDays(d, 1)) if (occursOn(t.recurrence, t.date, d) && !t.completions?.[d]) find(d) && find(d)!.left++;
       continue;
     }
-    const planned = t.firstScheduled ?? t.date;
+    const planned = t.date;
     if (!planned || planned >= today || t.someday) continue;
     const p = find(planned);
     if (!p) continue;

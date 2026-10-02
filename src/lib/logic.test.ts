@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseQuick, splitCapture, extractTime } from './parse';
 import { occursOn, nextOccurrence, describeRecurrence } from './recurrence';
-import { effectiveLevel, carriedDays } from './priority';
+import { effectiveLevel } from './priority';
 import { classifyColor, legacyToTasks, parseHeaderDates } from './importLegacy';
 import type { Task } from '../types';
 
@@ -122,9 +122,6 @@ describe('priority', () => {
     expect(effectiveLevel({ ...base, deadline: '2026-10-02' }, TODAY)).toEqual({ level: 'must', reason: 'due tomorrow' });
     expect(effectiveLevel({ ...base, deadline: '2026-10-04' }, TODAY).level).toBe('should');
     expect(effectiveLevel({ ...base, deadline: '2026-10-20' }, TODAY).level).toBe('could');
-  });
-  it('counts carried days', () => {
-    expect(carriedDays({ ...base, firstScheduled: '2026-09-28' })).toBe(3);
   });
 });
 

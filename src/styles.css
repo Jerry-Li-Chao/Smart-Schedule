@@ -896,7 +896,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .story.g-rhythm { --a: #042f2e; --b: #0d9488; --c: #38bdf8; }
 .story.g-streak { --a: #431407; --b: #ea580c; --c: #facc15; }
 .story.g-habit { --a: #052e16; --b: #16a34a; --c: #a3e635; }
-.story.g-comeback { --a: #1e1b4b; --b: #4f46e5; --c: #22d3ee; }
 .story.g-proj { --a: #3b0764; --b: #c026d3; --c: #f472b6; }
 .story.g-plate { --a: #0f172a; --b: #334155; --c: #64748b; }
 .story.g-outro { --a: #1e1b4b; --b: #be185d; --c: #f97316; }

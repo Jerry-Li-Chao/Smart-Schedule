@@ -3,7 +3,7 @@ import { S, useStore } from './store';
 import { uid } from './lib/id';
 import { addDays, diffDays, fmtDay, localDateTime, parseLocalDateTime, todayISO } from './lib/date';
 import { parseQuick, splitCapture, type Parsed } from './lib/parse';
-import { IMPORTANCE_HELP, isClosed, isStale } from './lib/priority';
+import { IMPORTANCE_HELP, isClosed } from './lib/priority';
 import { numberedTitle } from './lib/recurrence';
 import { askIfQuestion } from './lib/llm';
 
@@ -29,12 +29,11 @@ export function getProject(id?: string): Project | undefined {
 export const isInbox = (t: Task) =>
   !t.deleted && t.date === null && !t.someday && !t.projectId && !t.recurrence && !isClosed(t);
 
-/** Things waiting for a decision: unscheduled sticky notes + tasks you keep pushing. */
-export function planQueue(today = todayISO()): Task[] {
-  const all = tasks();
-  const inbox = all.filter(isInbox).sort((a, b) => a.createdAt - b.createdAt);
-  const stale = all.filter((t) => t.date && t.date <= today && isStale(t));
-  return [...inbox, ...stale];
+/** Things waiting for a decision: unscheduled sticky notes. */
+export function planQueue(): Task[] {
+  return tasks()
+    .filter(isInbox)
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 // ---------- creation ----------

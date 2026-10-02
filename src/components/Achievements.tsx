@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarCheck, ChevronLeft, ChevronRight, Flame, FolderKanban, Moon, Pause, Play, RotateCcw, Sparkles, Sun, Sunrise, Sunset, Target, Trophy, Undo2,
+  CalendarCheck, ChevronLeft, ChevronRight, Flame, FolderKanban, Moon, Pause, Play, RotateCcw, Sparkles, Sun, Sunrise, Sunset, Target, Trophy,
 } from 'lucide-react';
-import type { Importance, ISODate, Task } from '../types';
+import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
 import { diffDays, fmtDay, fromISO, startOfWeekMon, addDays, MONTHS } from '../lib/date';
 import { computeStats, LEVELS, PERIOD_LABEL, type Period, type Stats, type Win } from '../lib/achievements';
@@ -382,28 +382,6 @@ function buildSlides(s: Stats, today: ISODate): Slide[] {
     });
   }
 
-  if (s.comeback) {
-    slides.push({
-      id: 'comeback',
-      theme: 'g-comeback',
-      body: (
-        <>
-          <R className="s-kicker">
-            <Undo2 size={14} /> The comeback
-          </R>
-          <R d={1} className="s-big">
-            <b className="hl">“{s.comeback.title}”</b>
-          </R>
-          <R d={2} className="s-mid">
-            Pushed for <CountUp to={s.comeback.carried} delay={900} ms={900} /> days.
-          </R>
-          <R d={3} className="s-mid">And then you just… did it.</R>
-          <R d={4} className="s-sub">Done {fmtDay(s.comeback.date, today)}. The things we put off are usually the ones that feel best to finish.</R>
-        </>
-      ),
-    });
-  }
-
   if (s.projects.length) {
     const steps = s.projects.reduce((a, p) => a + p.steps, 0);
     slides.push({
@@ -516,7 +494,7 @@ function plateSlide(s: Stats, today: ISODate): Slide {
           <R key={t.id} d={3 + n * 0.4} className="s-left">
             <span className={cls('si-dot', `lvl-${effectiveLevel(t, today).level}`)} />
             <span className="sl-title">{t.title}</span>
-            <span className="sl-age">{age(t, today)}</span>
+            {t.deadline && <span className="sl-age">due {fmtDay(t.deadline, today)}</span>}
           </R>
         ))}
         <R d={4.5} className="s-sub">
@@ -533,12 +511,6 @@ function plateSlide(s: Stats, today: ISODate): Slide {
       </>
     ),
   };
-}
-
-function age(t: Task, today: ISODate) {
-  const since = t.firstScheduled ?? t.date!;
-  const n = diffDays(since, today);
-  return n <= 0 ? 'today' : `${n}d`;
 }
 
 function Ring({ pct, delay }: { pct: number; delay: number }) {
@@ -616,7 +588,7 @@ function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
               <li key={t.id} onClick={() => open(t.id)}>
                 <span className={cls('si-dot', `lvl-${effectiveLevel(t, today).level}`)} />
                 <span className="dl-title">{t.title}</span>
-                <span className="dl-meta">{t.date === today && !t.firstScheduled ? 'today' : `waiting ${age(t, today)}`}</span>
+                {t.deadline && <span className="dl-meta">due {fmtDay(t.deadline, today)}</span>}
               </li>
             ))}
             {left.overdue.length > 8 && <li className="dl-more">…and {left.overdue.length - 8} more</li>}
@@ -661,9 +633,8 @@ function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
                 <span className="wl-date">{dayLabel(day, today)}</span>
                 <span className="wl-items">
                   {ws.map((w) => (
-                    <span key={w.key} className={cls('wl-chip', `lvl-${w.importance}`)} onClick={() => open(w.key.split('|')[0])} title={w.carried >= 3 ? `Pushed ${w.carried} days first` : undefined}>
+                    <span key={w.key} className={cls('wl-chip', `lvl-${w.importance}`)} onClick={() => open(w.key.split('|')[0])}>
                       {w.title}
-                      {w.carried >= 3 && <i>↺{w.carried}d</i>}
                     </span>
                   ))}
                 </span>

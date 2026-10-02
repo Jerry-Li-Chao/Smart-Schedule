@@ -2,7 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { AlarmClock, ArrowUpRight, Check, CornerDownRight, Hourglass, Play, Repeat, Sparkles, StickyNote, UserRound } from 'lucide-react';
 import type { DayItem, ISODate, Project, Status, Task } from '../types';
 import { useStore, S } from '../store';
-import { carriedDays, effectiveLevel, IMPORTANCE_HELP } from '../lib/priority';
+import { effectiveLevel, IMPORTANCE_HELP } from '../lib/priority';
 import { addDays, fmtMD, fmtTime, nextMonday, todayISO } from '../lib/date';
 import { cls } from '../lib/id';
 import { numberedTitle } from '../lib/recurrence';
@@ -59,7 +59,6 @@ export const ItemCard = memo(function ItemCard({ item, today, project }: { item:
   const status = itemStatus(item);
   const closed = status === 'done' || status === 'dropped';
   const { level, reason } = effectiveLevel(item.kind === 'occ' ? { ...t, status } : t, today);
-  const carried = item.kind === 'task' && !closed ? carriedDays(t) : 0;
   const missed = item.kind === 'task' && !!t.time && !!t.date && t.date < today && !closed;
 
   return (
@@ -103,7 +102,7 @@ export const ItemCard = memo(function ItemCard({ item, today, project }: { item:
             {(item.kind === 'occ' ? numberedTitle(t, item.date) : t.title) || <em className="muted">Untitled</em>}
           </div>
         )}
-        <Meta t={t} item={item} project={project} carried={carried} reason={reason} missed={missed} status={status} />
+        <Meta t={t} item={item} project={project} reason={reason} missed={missed} status={status} />
       </div>
       <PriorityStrip t={t} repeating={item.kind === 'occ'} reason={reason} />
     </div>
@@ -142,17 +141,11 @@ function PriorityStrip({ t, repeating, reason }: { t: Task; repeating: boolean; 
   );
 }
 
-function Meta({ t, item, project, carried, reason, missed, status }: { t: Task; item: DayItem; project?: Project; carried: number; reason?: string; missed: boolean; status: Status }) {
+function Meta({ t, item, project, reason, missed, status }: { t: Task; item: DayItem; project?: Project; reason?: string; missed: boolean; status: Status }) {
   const bits: React.ReactNode[] = [];
   if (status === 'doing') bits.push(<span key="d" className="pill doing"><Play size={10} /> doing</span>);
   if (status === 'waiting') bits.push(<span key="w" className="pill waiting"><Hourglass size={10} /> waiting</span>);
   if (missed) bits.push(<span key="m" className="pill warn">missed?</span>);
-  if (carried > 0)
-    bits.push(
-      <span key="c" className={cls('pill', carried >= 3 ? 'stale' : 'carry')} title={`First planned for ${fmtMD(t.firstScheduled!)} — pushed back ${carried} day${carried > 1 ? 's' : ''} since`}>
-        pushed {carried}d
-      </span>,
-    );
   if (reason) bits.push(<span key="r" className="pill urgent"><ArrowUpRight size={10} /> {reason}</span>);
   else if (t.deadline && status !== 'done') bits.push(<span key="dl" className="pill">due {fmtMD(t.deadline)}</span>);
   if (item.kind === 'occ') bits.push(<Repeat key="rp" size={11} className="muted" />);

@@ -58,7 +58,7 @@ export function SettingsView() {
         </Field>
         <label className="check-row">
           <input type="checkbox" checked={settings.morningPlanning} onChange={(e) => set({ morningPlanning: e.target.checked })} />
-          Open “Plan” the first time I open the app each day if there are unplanned sticky notes or tasks I keep pushing
+          Open “Plan” the first time I open the app each day if there are unplanned sticky notes
         </label>
         <label className="check-row">
           <input type="checkbox" checked={settings.confirmBatchDelete !== false} onChange={(e) => set({ confirmBatchDelete: e.target.checked })} />

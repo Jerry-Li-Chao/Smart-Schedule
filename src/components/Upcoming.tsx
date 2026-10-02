@@ -100,7 +100,7 @@ export function Upcoming({ today }: { today: ISODate }) {
           {d.waiting.map((t) => (
             <div key={t.id} className="up-row" onClick={() => open(t)}>
               <span className="up-title">{t.title}</span>
-              {t.date && <span className="tiny muted">since {fmtDay(t.firstScheduled ?? t.date, today)}</span>}
+              {t.date && <span className="tiny muted">since {fmtDay(t.date, today)}</span>}
             </div>
           ))}
         </section>

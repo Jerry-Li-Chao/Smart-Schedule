@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, CircleDot, Copy, FolderTree, History, NotebookPen, RefreshCw, Repeat, Sparkles, Trash2, X } from 'lucide-react';
 import type { ISODate, Importance, Recurrence, Status, Task } from '../types';
 import { S, useStore } from '../store';
-import { addDays, addMonths, fmtDay, fmtMD, fmtTime, localDateTime, nextMonday, parseLocalDateTime, relDay } from '../lib/date';
+import { addDays, addMonths, fmtDay, fmtTime, localDateTime, nextMonday, parseLocalDateTime, relDay } from '../lib/date';
 import { describeRecurrence, numberedTitle } from '../lib/recurrence';
-import { carriedDays, effectiveLevel, IMPORTANCE_HELP } from '../lib/priority';
+import { effectiveLevel, IMPORTANCE_HELP } from '../lib/priority';
 import { cls } from '../lib/id';
 import { requestDelete, duplicateTask, getTask, projects, restoreVersion, setItemStatus, tasks, updateTask } from '../actions';
 import { Field, Segmented } from './ui';
@@ -44,7 +44,6 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
   const up = (patch: Partial<Task>, label?: string) => updateTask(t.id, patch, label);
   const close = () => S().setUI({ selectedId: undefined, occDate: undefined });
   const eff = effectiveLevel(t, today);
-  const carried = carriedDays(t);
   const rawOcc = occDate ? t.completions?.[occDate] : undefined;
   const occState = rawOcc === 'deleted' || rawOcc === 'moved' ? undefined : rawOcc;
 
@@ -163,12 +162,6 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
                 </button>
               ))}
             </div>
-          )}
-          {carried > 0 && (
-            <p className={cls('note-line', carried >= 3 && 'stale')}>
-              First planned for {fmtMD(t.firstScheduled!)} — pushed back {carried} day{carried > 1 ? 's' : ''}.
-              {carried >= 3 && ' Do it, break it down, or let it go?'}
-            </p>
           )}
           <div className="divider" />
           <RepeatField t={t} today={today} occDate={occDate} />

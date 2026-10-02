@@ -64,9 +64,8 @@ describe('achievements', () => {
     expect(computeStats(db(T({ id: 't_imp_a', status: 'done', date: '2026-03-04', doneAt: now, createdAt: now })), 'week', today).wins).toEqual([]);
   });
 
-  it('finds the comeback task', () => {
-    const s = computeStats(db(T({ title: 'Renew passport', status: 'done', firstScheduled: '2026-09-01', date: '2026-10-01', doneAt: at('2026-10-01') })), 'month', today);
-    expect(s.comeback).toMatchObject({ title: 'Renew passport', carried: 30 });
+  it('keeps a streak alive before today is done', () => {
+    const s = computeStats(db(T({ title: 'Renew passport', status: 'done', date: '2026-10-01', doneAt: at('2026-10-01') })), 'month', today);
     expect(s.currentStreak).toBe(1);
   });
 });
@@ -77,7 +76,7 @@ describe('trend', () => {
     const tr = computeTrend(
       db(
         T({ id: 'a', importance: 'must', status: 'done', date: '2026-10-01', doneAt: new Date('2026-10-01T10:00').getTime() }),
-        T({ id: 'b', importance: 'could', date: '2026-10-02', firstScheduled: '2026-09-30' }), // pushed from 9/30
+        T({ id: 'b', importance: 'could', date: '2026-09-30', stay: true }), // left on its day
         T({ id: 'c', status: 'dropped', date: '2026-09-29' }),
         T({ id: 'r', date: '2026-09-30', recurrence: { freq: 'daily', interval: 1 }, completions: { '2026-09-30': 'done' } }), // 10/1 missed, today pending
       ),

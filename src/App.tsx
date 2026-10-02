@@ -64,7 +64,7 @@ function Shell() {
   const entities = useStore((s) => s.entities);
   const mobile = useIsMobile();
   const inbox = useMemo(() => Object.values(entities).filter((e): e is Task => e.type === 'task' && isInbox(e)), [entities]);
-  const queueLen = useMemo(() => planQueue(today).length, [entities, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const queueLen = useMemo(() => planQueue().length, [entities]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // unfinished tasks follow you to today; first open of the day offers a plan
   useEffect(() => {
@@ -72,7 +72,7 @@ function Shell() {
     const st = S();
     if (st.settings.morningPlanning && st.settings.lastPlanDay !== today) {
       st.setSettings({ lastPlanDay: today });
-      if (planQueue(today).length) st.setUI({ planOpen: true });
+      if (planQueue().length) st.setUI({ planOpen: true });
     }
   }, [today]);
 
@@ -220,7 +220,7 @@ function TopBar({ today, queueLen }: { today: string; queueLen: number }) {
         <div className="tb-title">{titles[view]}</div>
       )}
       <span className="spacer" />
-      <button className={cls('btn tiny plan-top', queueLen > 0 && 'pulse')} title="Plan sticky notes and tasks you keep pushing  (P)" onClick={() => S().setUI({ planOpen: true })}>
+      <button className={cls('btn tiny plan-top', queueLen > 0 && 'pulse')} title="Plan your sticky notes  (P)" onClick={() => S().setUI({ planOpen: true })}>
         <Sparkles size={13} /> Plan{queueLen > 0 ? ` · ${queueLen}` : ''}
       </button>
       <button className="icon-btn" disabled={!canUndo} title="Undo (⌘Z)" onClick={() => S().undo()}>

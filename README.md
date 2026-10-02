@@ -9,8 +9,8 @@ with the data kept in the Sheet.
 
 | Sheet problem | What Planner does |
 |---|---|
-| Colours don't really say how important something is | Importance is one question — *“what happens if this slips a week?”* (Could / Should / Must). A **hard deadline** escalates the colour automatically (yellow 3 days out, red the day before), so a “could” due tomorrow still turns red. Column ⇅ button sorts a day by importance + deadline + how long it's been carried. |
-| Copying unfinished things forward by hand | Unfinished tasks **carry to today automatically** with a `pushed 3d` badge. Anything carried 3+ days shows up in **Plan** and asks you to decide: do it, break it down, wait on someone, or let it go. |
+| Colours don't really say how important something is | Importance is one question — *“what happens if this slips a week?”* (Could / Should / Must). A **hard deadline** escalates the colour automatically (yellow 3 days out, red the day before), so a “could” due tomorrow still turns red. Column ⇅ button sorts a day by importance and deadline. |
+| Copying unfinished things forward by hand | Unfinished tasks **carry to today automatically**, so nothing gets lost and nothing has to be copied. |
 | Ideas on a sticky never get done unless scheduled | The yellow **Sticky** is a plain text box: Enter saves. New tasks start as Must (change the default in Settings). If you typed a date (`tmr 9am`, `fri`, `in 6 months`, `明天`) it's scheduled immediately; otherwise it waits on the sticky until you **Plan** it (one-tap Today / Tmr / Weekend / Next wk, drag onto a day, park as an idea, or turn it into a project). Plan opens on your first launch each day if anything is waiting. On the Mac, **⌘⇧Space** opens a floating sticky from any app. |
 | Recurring things (bills, meds, classes) | `pay rent every month on the 25th`, `gym every mon, wed and fri`, `每周一 健身`. Each day's copy is checked off on its own. |
 | Long-horizon things (a renewal 6 months out) | `passport renewal in 6 months` → lands on the right day with an automatic reminder 2 weeks before. The **Ahead** view lists everything months out, reminders, deadlines, repeating tasks, and what you're waiting on. |

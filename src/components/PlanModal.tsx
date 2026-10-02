@@ -3,19 +3,18 @@ import { GitBranch, Lightbulb, Trash2, X, Clock, Sparkles } from 'lucide-react';
 import type { Importance, ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, fmtDay, fmtMD, nextMonday, weekendOf } from '../lib/date';
-import { carriedDays, IMPORTANCE_HELP } from '../lib/priority';
+import { IMPORTANCE_HELP } from '../lib/priority';
 import { deleteEntity, isInbox, planQueue, promoteToProject, updateTask } from '../actions';
 import { DateButton, Segmented } from './ui';
 
 /**
- * One decision at a time: every sticky note gets a day (or is consciously parked),
- * and anything carried 3+ days gets confronted instead of silently rolling forward.
+ * One decision at a time: every sticky note gets a day (or is consciously parked).
  */
 export function PlanModal({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
   const [later, setLater] = useState<Set<string>>(new Set());
   const [handled, setHandled] = useState(0);
-  const queue = useMemo(() => planQueue(today).filter((t) => !later.has(t.id)), [entities, later, today]); // eslint-disable-line react-hooks/exhaustive-deps
+  const queue = useMemo(() => planQueue().filter((t) => !later.has(t.id)), [entities, later, today]); // eslint-disable-line react-hooks/exhaustive-deps
   const t = queue[0];
   const close = () => S().setUI({ planOpen: false });
 
@@ -61,13 +60,11 @@ export function PlanModal({ today }: { today: ISODate }) {
         {!t ? (
           <div className="plan-done">
             <div className="big">✓</div>
-            <p>{handled ? `${handled} decided. ` : ''}Everything on the sticky has a day, and nothing is quietly slipping.</p>
+            <p>{handled ? `${handled} decided. ` : ''}Everything on the sticky has a day.</p>
             <button className="btn primary" onClick={close}>Back to the calendar</button>
           </div>
-        ) : isInbox(t) ? (
-          <InboxDecision key={t.id} t={t} today={today} done={done} later={() => setLater((s) => new Set(s).add(t.id))} />
         ) : (
-          <StaleDecision key={t.id} t={t} today={today} done={done} later={() => setLater((s) => new Set(s).add(t.id))} />
+          <InboxDecision key={t.id} t={t} today={today} done={done} later={() => setLater((s) => new Set(s).add(t.id))} />
         )}
       </div>
     </div>
@@ -120,38 +117,6 @@ function InboxDecision({ t, today, done, later }: { t: Task; today: ISODate; don
         </button>
         <button className="btn ghost" onClick={later}>
           <Clock size={14} /> Decide later <kbd>L</kbd>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function StaleDecision({ t, today, done, later }: { t: Task; today: ISODate; done: (f: () => void) => void; later: () => void }) {
-  const carried = carriedDays(t);
-  return (
-    <div className="plan-body">
-      <div className="plan-kicker stale-text">Pushed back {carried} days (first planned for {fmtMD(t.firstScheduled!)})</div>
-      <div className="plan-title">{t.title}</div>
-      <div className="small muted">Things that keep sliding are usually too vague, too big, or not actually important. Which is it?</div>
-      <ImportancePick t={t} />
-      <div className="plan-grid">
-        <button className="btn big" onClick={() => done(() => sched(t, today))}><kbd>1</kbd> Doing it today</button>
-        <button className="btn big" onClick={() => done(() => sched(t, addDays(today, 1)))}><kbd>2</kbd> Tomorrow, for real</button>
-        <button className="btn big" onClick={() => done(() => sched(t, nextMonday(today)))}><kbd>3</kbd> Next week</button>
-        <DateButton className="btn big as-btn" onPick={(d) => done(() => sched(t, d))}>Pick a day…</DateButton>
-      </div>
-      <div className="plan-alt">
-        <button className="btn ghost" onClick={() => done(() => promoteToProject(t.id))}>
-          <GitBranch size={14} /> Too big — break into steps
-        </button>
-        <button className="btn ghost" onClick={() => done(() => updateTask(t.id, { status: 'waiting', firstScheduled: today }, `Waiting on others: “${t.title}”`))}>
-          <Clock size={14} /> Waiting on someone
-        </button>
-        <button className="btn ghost" onClick={() => done(() => updateTask(t.id, { status: 'dropped' }, `Let go of “${t.title}”`))}>
-          <Trash2 size={14} /> Let it go (obsolete)
-        </button>
-        <button className="btn ghost" onClick={later}>
-          Skip <kbd>L</kbd>
         </button>
       </div>
     </div>
