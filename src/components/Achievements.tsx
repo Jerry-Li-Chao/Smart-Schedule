@@ -29,8 +29,8 @@ export function Achievements({ today }: { today: ISODate }) {
           onChange={setPeriod}
           options={[
             { value: 'week', label: 'This week' },
-            { value: 'month', label: 'Past 30 days' },
-            { value: 'year', label: `${today.slice(0, 4)} so far` },
+            { value: 'month', label: 'This month' },
+            { value: 'year', label: `This year` },
           ]}
         />
         <span className="muted small">

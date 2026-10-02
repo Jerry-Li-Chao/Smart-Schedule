@@ -22,6 +22,8 @@ describe('achievements', () => {
 
   it('picks the right ranges', () => {
     expect(periodRange('week', today)).toMatchObject({ from: '2026-09-28', to: today, prevFrom: '2026-09-21', prevTo: '2026-09-25' });
+    expect(periodRange('month', today)).toMatchObject({ from: '2026-10-01', prevFrom: '2026-09-01', prevTo: '2026-09-02' });
+    expect(periodRange('month', '2026-03-31')).toMatchObject({ prevFrom: '2026-02-01', prevTo: '2026-02-28' });
     expect(periodRange('year', today)).toMatchObject({ from: '2026-01-01', prevFrom: '2025-01-01', prevTo: '2025-10-02' });
   });
 
@@ -45,6 +47,21 @@ describe('achievements', () => {
     expect(s.habits[0]).toMatchObject({ title: 'Spanish L#', done: 2, scheduled: 4 }); // 28, 29, 1, 2 (30 deleted)
     expect(s.left.overdue.map((t) => t.id)).toEqual(['open']);
     expect(s.left.byLevel.must).toBe(1);
+  });
+
+  it('dates imported tasks by their own day, not the moment of import', () => {
+    const now = at(today, 15);
+    const s = computeStats(
+      db(
+        T({ id: 't_imp_a', status: 'done', date: '2026-03-04', doneAt: now, createdAt: now }), // old import
+        T({ id: 't_imp_b', status: 'done', date: '2026-03-05', doneAt: at('2026-03-05', 12), createdAt: now }), // new import
+        T({ id: 't_imp_c', status: 'done', date: '2026-09-30', doneAt: at(today, 18), createdAt: now - 86400000 * 3 }), // imported open, ticked later
+      ),
+      'year',
+      today,
+    );
+    expect(s.wins.map((w) => [w.date, w.hour])).toEqual([['2026-03-04', undefined], ['2026-03-05', undefined], [today, 18]]);
+    expect(computeStats(db(T({ id: 't_imp_a', status: 'done', date: '2026-03-04', doneAt: now, createdAt: now })), 'week', today).wins).toEqual([]);
   });
 
   it('finds the comeback task', () => {

@@ -1,5 +1,5 @@
 import type { Entity, Importance, ISODate, Project, Task } from '../types';
-import { addDays, diffDays, startOfWeekMon, toISO, weekday } from './date';
+import { addDays, addMonths, diffDays, startOfWeekMon, toISO, weekday } from './date';
 import { effectiveLevel, isClosed } from './priority';
 import { numberedTitle, occursOn } from './recurrence';
 
@@ -54,24 +54,43 @@ export interface Stats {
   };
 }
 
+/**
+ * Calendar periods, all ending today: this week (Mon–today), this month (1st–today), this year (Jan 1–today).
+ * Each is compared with the same stretch of the previous week / month / year, so a Wednesday is
+ * compared with last Mon–Wed, not with a whole week.
+ */
 export function periodRange(p: Period, today: ISODate): { from: ISODate; to: ISODate; prevFrom: ISODate; prevTo: ISODate } {
   if (p === 'week') {
     const from = startOfWeekMon(today);
     return { from, to: today, prevFrom: addDays(from, -7), prevTo: addDays(today, -7) };
   }
-  if (p === 'month') return { from: addDays(today, -29), to: today, prevFrom: addDays(today, -59), prevTo: addDays(today, -30) };
+  if (p === 'month') {
+    const from = `${today.slice(0, 8)}01`;
+    // same day last month, clamped to its end (Mar 31 → Feb 1–28)
+    return { from, to: today, prevFrom: addMonths(from, -1), prevTo: addMonths(today, -1) };
+  }
   const y = Number(today.slice(0, 4));
-  return { from: `${y}-01-01`, to: today, prevFrom: `${y - 1}-01-01`, prevTo: `${y - 1}${today.slice(4)}` };
+  const prevTo = today.slice(5) === '02-29' ? `${y - 1}-02-28` : `${y - 1}${today.slice(4)}`;
+  return { from: `${y}-01-01`, to: today, prevFrom: `${y - 1}-01-01`, prevTo };
 }
 
 export const PERIOD_LABEL: Record<Period, { now: string; prev: string }> = {
-  week: { now: 'This week', prev: 'last week' },
-  month: { now: 'The past 30 days', prev: 'the 30 days before' },
-  year: { now: 'This year', prev: 'this time last year' },
+  week: { now: 'This week', prev: 'this point last week' },
+  month: { now: 'This month', prev: 'this point last month' },
+  year: { now: 'This year', prev: 'this point last year' },
 };
 
 /** a series' name without its trailing number placeholder ("Vitamin D #" → "Vitamin D") */
 const seriesName = (t: Task) => t.title.replace(/\s+#\s*$/, '').trim();
+
+/**
+ * Tasks imported from the sheet only know their day. Older imports stamped them "done" at the
+ * moment of import, which would make a whole history look like this week's work — use their day.
+ */
+function dayOnly(t: Task): boolean {
+  if (!t.id.startsWith('t_imp') || !t.date || !t.doneAt) return false;
+  return Math.abs(t.doneAt - t.createdAt) < 120_000 || t.doneAt === new Date(`${t.date}T12:00:00`).getTime();
+}
 
 /** Every completion in the data, one per task or per day of a repeating task. */
 export function allWins(entities: Record<string, Entity>): Win[] {
@@ -82,7 +101,7 @@ export function allWins(entities: Record<string, Entity>): Win[] {
       for (const [d, s] of Object.entries(e.completions ?? {}))
         if (s === 'done') out.push({ key: `${e.id}|${d}`, title: numberedTitle(e, d), date: d, importance: e.importance, projectId: e.projectId, carried: 0 });
     } else if (e.status === 'done') {
-      const at = e.doneAt ? new Date(e.doneAt) : null;
+      const at = e.doneAt && !dayOnly(e) ? new Date(e.doneAt) : null;
       const date = at ? toISO(at) : e.date;
       if (!date) continue;
       out.push({

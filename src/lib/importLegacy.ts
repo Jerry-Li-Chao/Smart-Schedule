@@ -97,6 +97,7 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
         // same task carried to another day: keep one task, remember when it started
         prev.date = date;
         prev.status = status;
+        prev.doneAt = status === 'done' ? doneOn(date) : undefined;
         if (kind.importance !== 'could') prev.importance = kind.importance;
         return;
       }
@@ -110,7 +111,7 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
         firstScheduled: date,
         importance: kind.importance,
         status,
-        doneAt: status === 'done' ? now : undefined,
+        doneAt: status === 'done' ? doneOn(date) : undefined, // the sheet only knows the day, not the moment
         order: r,
         createdAt: now,
         updatedAt: now,
@@ -124,3 +125,6 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
   for (const t of out) if (t.date && t.date < opts.today) t.stay = true;
   return out;
 }
+
+/** Imported tasks were done on their own day — never "at import time", or they'd all count as this week's wins. */
+const doneOn = (d: ISODate) => new Date(`${d}T12:00:00`).getTime();
