@@ -1,0 +1,21 @@
+# dependencies & build output
+node_modules/
+dist/
+dist-gas/
+release/
+apps-script/Index.html
+
+# personal / machine-specific — never commit
+apps-script/.clasp.json
+.claude/
+.env
+.env.*
+*.log
+.DS_Store
+
+# your data: exported backups, downloaded sheets, test files
+planner-*.json
+*.xlsx
+*.xls
+*.csv
+__test*

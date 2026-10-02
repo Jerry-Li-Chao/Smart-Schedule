@@ -1,0 +1,126 @@
+import type { ISODate, Importance, Status, Task } from '../types';
+import { fromISO, toISO } from './date';
+import { extractTime } from './parse';
+import { hashId } from './id';
+
+/**
+ * Converts the old "one column per day, colour = meaning" sheet into tasks.
+ * red → must · yellow → should · green → done · grey → obsolete · anything else → could.
+ */
+export interface LegacySheet {
+  name: string;
+  header: string[]; // display values of row 1
+  cells: string[][]; // rows 2..n, display values
+  bgs: string[][]; // rows 2..n, hex backgrounds
+}
+
+export function classifyColor(hex: string): { importance: Importance; status: Status } | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return { importance: 'could', status: 'open' };
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const sat = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1));
+  if (l > 0.97) return { importance: 'could', status: 'open' }; // white
+  if (sat < 0.12) return { importance: 'could', status: 'dropped' }; // grey
+  let h = 0;
+  if (max === r) h = ((g - b) / (max - min)) % 6;
+  else if (max === g) h = (b - r) / (max - min) + 2;
+  else h = (r - g) / (max - min) + 4;
+  h = (h * 60 + 360) % 360;
+  if (h < 22 || h >= 335) return { importance: 'must', status: 'open' };
+  if (h >= 40 && h < 68) return { importance: 'should', status: 'open' };
+  if (h >= 68 && h < 170) return { importance: 'could', status: 'done' };
+  return { importance: 'could', status: 'open' };
+}
+
+/** "9/28", "9/28/2026", "2026-09-28", "Mon 9/28" → ISO, inferring the year as columns advance. */
+export function parseHeaderDates(header: string[], sheetName: string, fallbackYear: number): (ISODate | null)[] {
+  let year = Number(/20\d\d/.exec(sheetName)?.[0] ?? fallbackYear);
+  let lastMonth = 0;
+  return header.map((h) => {
+    const s = String(h ?? '').trim();
+    let m = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    if (m) {
+      year = Number(m[1]);
+      lastMonth = Number(m[2]);
+      return toISO(new Date(year, Number(m[2]) - 1, Number(m[3])));
+    }
+    m = /(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/.exec(s);
+    if (!m) return null;
+    const mo = Number(m[1]);
+    if (m[3]) year = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+    else if (lastMonth && mo < lastMonth - 6) year += 1; // Dec → Jan
+    lastMonth = mo;
+    return toISO(new Date(year, mo - 1, Number(m[2])));
+  });
+}
+
+/** "(cont.)" / "(continued)" / "(续)" at the end of a cell = the same task carried to another day */
+const CONT_RE = /\s*[(（]\s*(续|cont\.?|continued)\s*[)）]\s*$/i;
+
+export interface ImportOptions {
+  from: ISODate;
+  to?: ISODate;
+  today: ISODate;
+  /** what to do with red/yellow/white cells before `today` that were never marked green */
+  /** what to do with red/yellow/white cells on past days: leave them as they are, or mark them obsolete */
+  oldUnfinished: 'keep' | 'obsolete';
+  existing: Set<string>;
+}
+
+export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
+  const dates = parseHeaderDates(sheet.header, sheet.name, fromISO(opts.today).getFullYear());
+  const out: Task[] = [];
+  const byTitle = new Map<string, Task>(); // for merging "(cont.)" continuations
+  const now = Date.now();
+
+  dates.forEach((date, col) => {
+    if (!date || date < opts.from || (opts.to && date > opts.to)) return;
+    sheet.cells.forEach((row, r) => {
+      const raw = String(row[col] ?? '').trim();
+      if (!raw) return;
+      const kind = classifyColor(sheet.bgs[r]?.[col] ?? '#ffffff');
+      if (!kind) return;
+      const isCont = CONT_RE.test(raw);
+      const { title, time } = extractTime(raw.replace(CONT_RE, ''));
+      const key = title.toLowerCase();
+      let status = kind.status;
+      if (status === 'open' && date < opts.today && opts.oldUnfinished === 'obsolete') status = 'dropped';
+
+      const prev = isCont ? byTitle.get(key) : undefined;
+      if (prev) {
+        // same task carried to another day: keep one task, remember when it started
+        prev.date = date;
+        prev.status = status;
+        if (kind.importance !== 'could') prev.importance = kind.importance;
+        return;
+      }
+      const id = hashId('t_imp', `${sheet.name}|${date}|${r}|${raw}`);
+      const t: Task = {
+        type: 'task',
+        id,
+        title,
+        time,
+        date,
+        firstScheduled: date,
+        importance: kind.importance,
+        status,
+        doneAt: status === 'done' ? now : undefined,
+        order: r,
+        createdAt: now,
+        updatedAt: now,
+        notes: undefined,
+      };
+      byTitle.set(key, t); // registered even when skipped, so its "(cont.)" copies are skipped too
+      if (!opts.existing.has(id)) out.push(t);
+    });
+  });
+  // past days stay where they were in the sheet instead of all piling onto today
+  for (const t of out) if (t.date && t.date < opts.today) t.stay = true;
+  return out;
+}

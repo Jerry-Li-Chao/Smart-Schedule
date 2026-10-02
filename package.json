@@ -1,0 +1,55 @@
+{
+  "name": "planner",
+  "productName": "Planner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Day-column planner with a sticky-note inbox, projects/flows, reminders and Google Sheets sync",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron -c blue,magenta \"vite\" \"wait-on http://localhost:5173 && VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "web": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "start": "npm run build && electron .",
+    "test": "vitest run && node apps-script/test/sync.test.mjs",
+    "build:gas": "vite build --mode gas && node scripts/build-gas.mjs",
+    "gas:push": "npm run build:gas && cd apps-script && npx @google/clasp push",
+    "dist": "npm run build && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.smartschedule.planner",
+    "productName": "Planner",
+    "files": [
+      "dist/**",
+      "electron/**"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    },
+    "directories": {
+      "output": "release"
+    }
+  },
+  "dependencies": {
+    "lucide-react": "^1.49.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.2",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.11",
+    "wait-on": "^9.5.1"
+  }
+}
