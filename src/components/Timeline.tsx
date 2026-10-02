@@ -206,7 +206,9 @@ export function Timeline({ today }: { today: ISODate }) {
   // the section is pinned to the bottom of the window (like a frozen row), so it never jumps;
   // the page is just tall enough for the longest day plus that section
   const tallest = Math.ceil(Math.max(0, ...cols.map((d) => regH[d] ?? 0)));
-  const tracksH = trackRows.length ? 32 + (tracksCollapsed ? 0 : trackRows.reduce((s, r) => s + r.h + 6, 0)) : 0;
+  // at most MAX_TRACK_ROWS rows are visible; the rest scroll inside the strip (all days together)
+  const tracksCapH = trackRows.slice(0, MAX_TRACK_ROWS).reduce((s, r) => s + r.h + 6, 0);
+  const tracksH = trackRows.length ? 32 + (tracksCollapsed ? 0 : tracksCapH) : 0;
   const pageH = Math.max(vh, (HEAD_H + tallest + tracksH + 40) * tz);
 
   return (
@@ -222,6 +224,8 @@ export function Timeline({ today }: { today: ISODate }) {
             tracks={tracks}
             trackRows={trackRows}
             collapsed={tracksCollapsed}
+            capH={tracksCapH}
+            hiddenRows={Math.max(0, trackRows.length - MAX_TRACK_ROWS)}
             tz={tz}
             onMeasure={report}
             projects={idx.projects}
@@ -238,6 +242,24 @@ export function Timeline({ today }: { today: ISODate }) {
 }
 
 const HEAD_H = 38;
+const MAX_TRACK_ROWS = 3;
+
+// Every day has its own copy of the strip; keep them scrolled to the same row so they stay aligned.
+let trackScrollTop = 0;
+let syncing = false;
+function onTrackScroll(e: React.UIEvent<HTMLDivElement>) {
+  if (syncing) return;
+  trackScrollTop = e.currentTarget.scrollTop;
+  syncing = true;
+  document.querySelectorAll<HTMLDivElement>('.tracks-scroll').forEach((el) => {
+    if (el !== e.currentTarget) el.scrollTop = trackScrollTop;
+  });
+  requestAnimationFrame(() => (syncing = false));
+}
+/** New columns scrolling into view start at the shared position. */
+function syncTrackScroll(el: HTMLDivElement | null) {
+  if (el && el.scrollTop !== trackScrollTop) el.scrollTop = trackScrollTop;
+}
 const TRACK_CARD_H = 44;
 
 /** Which aligned row an item belongs to, or null for the normal sorted list. */
@@ -256,6 +278,8 @@ interface ColProps {
   tracks: Map<string, DayItem[]>;
   trackRows: { key: string; h: number }[];
   collapsed: boolean;
+  capH: number;
+  hiddenRows: number;
   tz: number;
   onMeasure: (date: ISODate, h: number) => void;
   projects: Record<string, Project>;
@@ -266,7 +290,7 @@ interface ColProps {
   onHeaderWheel: (e: React.WheelEvent) => void;
 }
 
-const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRows, collapsed, tz, onMeasure, projects, left, width, dropIndex, setDrop, onHeaderWheel }: ColProps) {
+const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRows, collapsed, capH, hiddenRows, tz, onMeasure, projects, left, width, dropIndex, setDrop, onHeaderWheel }: ColProps) {
   const listRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = listRef.current!;
@@ -345,14 +369,19 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
           <button className="tracks-label" onClick={() => S().setSettings({ tracksCollapsed: !collapsed })} title={collapsed ? 'Show projects & series' : 'Hide to see more of each day'}>
             {collapsed ? <ChevronUp size={12} /> : <ChevronDown size={12} />} Projects &amp; series
             {collapsed && <span className="tracks-count">{[...tracks.values()].flat().length || ''}</span>}
+            {!collapsed && hiddenRows > 0 && <span className="tracks-more">+{hiddenRows} more · scroll</span>}
           </button>
-          {!collapsed && trackRows.map((row) => (
-            <div key={row.key} className="track-row" style={{ height: row.h }}>
-              {(tracks.get(row.key) ?? []).map((it) => (
-                <ItemCard key={it.key} item={it} today={today} project={it.kind !== 'follow' && it.task.projectId ? projects[it.task.projectId] : undefined} />
+          {!collapsed && (
+            <div className={cls('tracks-scroll', hiddenRows > 0 && 'has-more')} style={{ maxHeight: capH }} ref={syncTrackScroll} onScroll={onTrackScroll}>
+              {trackRows.map((row) => (
+                <div key={row.key} className="track-row" style={{ height: row.h }}>
+                  {(tracks.get(row.key) ?? []).map((it) => (
+                    <ItemCard key={it.key} item={it} today={today} project={it.kind !== 'follow' && it.task.projectId ? projects[it.task.projectId] : undefined} />
+                  ))}
+                </div>
               ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </section>

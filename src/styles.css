@@ -850,3 +850,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .al-name { width: 110px; font-weight: 500; font-size: 13px; }
 .alert-level input[type='number'] { width: 70px; }
 @media (prefers-color-scheme: dark) { .alert.i2 { background: #3a2e10; } }
+
+/* projects & series strip: capped at 3 rows, the rest scroll (all days in sync) */
+.tracks-scroll { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.tracks-scroll.has-more { mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
+.tracks-more { margin-left: auto; font-size: 10px; letter-spacing: 0; text-transform: none; font-weight: 600; color: var(--accent); }
+.tracks-scroll > .track-row { flex-shrink: 0; }
