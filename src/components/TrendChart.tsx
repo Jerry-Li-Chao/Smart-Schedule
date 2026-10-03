@@ -9,9 +9,9 @@ import { Segmented } from './ui';
 
 type SeriesKey = 'must' | 'should' | 'could' | 'left';
 const SERIES: { key: SeriesKey; label: string }[] = [
-  { key: 'must', label: 'Must done' },
-  { key: 'should', label: 'Should done' },
-  { key: 'could', label: 'Could done' },
+  { key: 'must', label: 'Must' },
+  { key: 'should', label: 'Should' },
+  { key: 'could', label: 'Could' },
   { key: 'left', label: 'Left behind' },
 ];
 const H = 220;
@@ -114,6 +114,7 @@ export function TrendChart({ today }: { today: ISODate }) {
         />
       </div>
       <div className="trend-legend">
+        <span className="tl-group">Done</span>
         {SERIES.map((s) => (
           <button key={s.key} className={cls('tl-key', `k-${s.key}`, hidden.has(s.key) && 'off')} onClick={() => toggle(s.key)} title={hidden.has(s.key) ? 'Show' : 'Hide'}>
             <i />
@@ -182,8 +183,9 @@ export function TrendChart({ today }: { today: ISODate }) {
         {hp && (
           <div className={cls('tr-tip', x(hover!) > w * 0.62 && 'flip')} style={x(hover!) > w * 0.62 ? { right: w - x(hover!) + 14 } : { left: x(hover!) + 14 }}>
             <div className="tt-date">{unit === 'day' ? md(hp.from) : hp.from === hp.to ? md(hp.from) : `${md(hp.from)} – ${md(hp.to)}`}</div>
+            {shown.some((s) => s.key !== 'left') && <div className="tt-group">Done</div>}
             {shown.map((s) => (
-              <div key={s.key} className={cls('tt-row', `k-${s.key}`)}>
+              <div key={s.key} className={cls('tt-row', `k-${s.key}`, s.key === 'left' && 'tt-sep')}>
                 <i />
                 {s.label}
                 <b>{hp[s.key]}</b>

@@ -1095,3 +1095,7 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .pa.done:hover { background: var(--done-bg); color: var(--done); border-color: var(--done); }
 .pa.drop:hover { background: var(--drop-bg); }
 .app.mobile .plate-acts { display: inline-flex; }
+.dl-when { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 58px; flex-shrink: 0; }
+.tt-group { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 2px 0 1px; }
+.tt-row.tt-sep { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); }
+.tl-group { font-size: 11.5px; color: var(--muted); font-weight: 600; margin-right: -2px; }

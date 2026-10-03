@@ -628,6 +628,7 @@ function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
             {plate.slice(0, 8).map((t) => (
               <li key={t.id} className="plate-row" onClick={() => open(t.id)}>
                 <span className={cls('si-dot', `lvl-${effectiveLevel(t, today).level}`)} />
+                <span className="dl-when" title="The day it was first written down">{fmtDay(t.firstScheduled ?? t.date!, today)}</span>
                 <span className="dl-title">{t.title}</span>
                 {t.deadline && <span className="dl-meta">due {fmtDay(t.deadline, today)}</span>}
                 <span className="plate-acts" onClick={(e) => e.stopPropagation()}>
