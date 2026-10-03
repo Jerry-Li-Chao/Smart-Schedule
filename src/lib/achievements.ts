@@ -245,7 +245,18 @@ export interface TrendPoint {
  * Completions per importance vs. things left behind, bucketed by day (≤ 1 month),
  * week (≤ 1 year) or month (all time).
  */
-export function computeTrend(entities: Record<string, Entity>, range: TrendRange, today: ISODate): { unit: 'day' | 'week' | 'month'; points: TrendPoint[] } {
+/**
+ * The day of the latest Google Sheet import that brought in finished tasks. The sheet only says
+ * *that* something was done (green), not how important it was — so wins before this are mostly "Could".
+ */
+export function lastImportDay(entities: Record<string, Entity>): ISODate | undefined {
+  let at = 0;
+  for (const e of Object.values(entities))
+    if (e.type === 'task' && !e.deleted && e.status === 'done' && dayOnly(e) && e.createdAt > at) at = e.createdAt;
+  return at ? toISO(new Date(at)) : undefined;
+}
+
+export function computeTrend(entities: Record<string, Entity>, range: TrendRange, today: ISODate): { unit: 'day' | 'week' | 'month'; points: TrendPoint[]; importDay?: ISODate } {
   const wins = allWins(entities);
   const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
 
@@ -297,5 +308,5 @@ export function computeTrend(entities: Record<string, Entity>, range: TrendRange
     const doneDay = t.status === 'done' ? (t.doneAt && !dayOnly(t) ? toISO(new Date(t.doneAt)) : t.date) : null;
     if (!doneDay || doneDay > p.to) p.left++;
   }
-  return { unit, points };
+  return { unit, points, importDay: lastImportDay(entities) };
 }

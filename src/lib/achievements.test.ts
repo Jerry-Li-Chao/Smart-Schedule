@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeStats, computeTrend, periodLabel, periodRange } from './achievements';
+import { computeStats, computeTrend, lastImportDay, periodLabel, periodRange } from './achievements';
 import type { Entity, Task } from '../types';
 
 const T = (p: Partial<Task>): Task => ({
@@ -69,6 +69,7 @@ describe('achievements', () => {
       today,
     );
     expect(s.wins.map((w) => [w.date, w.hour])).toEqual([['2026-03-04', undefined], ['2026-03-05', undefined], [today, 18]]);
+    expect(lastImportDay(db(T({ id: 't_imp_a', status: 'done', date: '2026-03-04', doneAt: now, createdAt: now }), T({ id: 'x', status: 'done', date: today, doneAt: now })))).toBe(today);
     expect(computeStats(db(T({ id: 't_imp_a', status: 'done', date: '2026-03-04', doneAt: now, createdAt: now })), 'week', today).wins).toEqual([]);
   });
 

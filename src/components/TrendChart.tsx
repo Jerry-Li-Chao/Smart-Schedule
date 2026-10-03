@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { Info, TrendingUp } from 'lucide-react';
 import type { ISODate } from '../types';
 import { useStore } from '../store';
-import { fromISO, MONTHS } from '../lib/date';
+import { diffDays, fmtDay, fromISO, MONTHS } from '../lib/date';
 import { computeTrend, type TrendPoint, type TrendRange } from '../lib/achievements';
 import { cls } from '../lib/id';
 import { Segmented } from './ui';
@@ -58,7 +58,7 @@ export function TrendChart({ today }: { today: ISODate }) {
   const [hover, setHover] = useState<number | null>(null);
   const [w, setW] = useState(600);
   const box = useRef<HTMLDivElement>(null);
-  const { unit, points } = useMemo(() => computeTrend(entities, range, today), [entities, range, today]);
+  const { unit, points, importDay } = useMemo(() => computeTrend(entities, range, today), [entities, range, today]);
 
   useEffect(() => {
     const el = box.current;
@@ -89,6 +89,15 @@ export function TrendChart({ today }: { today: ISODate }) {
     });
 
   const hp = hover !== null ? points[hover] : null;
+  // where the import happened, between bucket starts (points are drawn at each bucket's start)
+  const imp = (() => {
+    if (!importDay || !points.length || importDay < points[0].from) return null;
+    const i = points.findIndex((p) => importDay >= p.from && importDay <= p.to);
+    if (i < 0) return null;
+    const p = points[i];
+    const pos = i + (diffDays(p.from, importDay) + 1) / (diffDays(p.from, p.to) + 1);
+    return { x: x(Math.min(pos, points.length - 1)), beforeIdx: i };
+  })();
   return (
     <section className="dash-card trend">
       <div className="dash-head">
@@ -158,6 +167,26 @@ export function TrendChart({ today }: { today: ISODate }) {
               </text>
             ) : null,
           )}
+          {imp && (
+            <g className="tr-import">
+              <defs>
+                <pattern id="tr-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                  <line x1="0" y1="0" x2="0" y2="6" />
+                </pattern>
+              </defs>
+              <rect x={PAD.l} y={PAD.t} width={Math.max(0, imp.x - PAD.l)} height={ih} fill="url(#tr-hatch)" />
+              <line x1={imp.x} x2={imp.x} y1={PAD.t - 4} y2={PAD.t + ih} />
+              {imp.x - PAD.l > 210 ? (
+                <text x={imp.x - 5} y={PAD.t + 8} textAnchor="end">
+                  ← imported · importance not recorded
+                </text>
+              ) : (
+                <text x={imp.x + 5} y={PAD.t + 8}>
+                  Google Sheet import
+                </text>
+              )}
+            </g>
+          )}
           <g clipPath="url(#tr-reveal)">
             {!hidden.has('left') && (
               <>
@@ -184,6 +213,7 @@ export function TrendChart({ today }: { today: ISODate }) {
           <div className={cls('tr-tip', x(hover!) > w * 0.62 && 'flip')} style={x(hover!) > w * 0.62 ? { right: w - x(hover!) + 14 } : { left: x(hover!) + 14 }}>
             <div className="tt-date">{unit === 'day' ? md(hp.from) : hp.from === hp.to ? md(hp.from) : `${md(hp.from)} – ${md(hp.to)}`}</div>
             {shown.some((s) => s.key !== 'left') && <div className="tt-group">Done</div>}
+            {imp && hover! < imp.beforeIdx + 1 && <div className="tt-imp">From the Google Sheet import — mostly counted as Could</div>}
             {shown.map((s) => (
               <div key={s.key} className={cls('tt-row', `k-${s.key}`, s.key === 'left' && 'tt-sep')}>
                 <i />
@@ -194,6 +224,15 @@ export function TrendChart({ today }: { today: ISODate }) {
           </div>
         )}
       </div>
+      {imp && (
+        <div className="tr-note">
+          <Info size={13} />
+          <span>
+            Everything left of the line came from your Google Sheet import on {fmtDay(importDay!)}. The sheet only shows <i>that</i> a task was done (green), not
+            how important it was, so those wins count as Could. Must and Should are tracked from the import onward.
+          </span>
+        </div>
+      )}
     </section>
   );
 }
