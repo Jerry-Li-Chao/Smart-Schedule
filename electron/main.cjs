@@ -147,8 +147,21 @@ async function backupIfNeeded(json) {
 // ---------- network: sync requests go through Node so there is no CORS to fight ----------
 ipcMain.handle('http:post', async (_e, url, body) => {
   if (typeof url !== 'string' || !url.startsWith('https://')) throw new Error('Only https URLs are allowed');
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' });
-  return { status: r.status, text: await r.text() };
+  // After the Mac sleeps, the first request often hits a connection that died meanwhile
+  // (ECONNRESET). Sync is idempotent, so one quiet retry is safe.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow', signal: AbortSignal.timeout(60000) });
+      return { status: r.status, text: await r.text() };
+    } catch (err) {
+      if (attempt < 1) {
+        await new Promise((res) => setTimeout(res, 1500));
+        continue;
+      }
+      // hand back a quiet failure instead of throwing, so it isn't logged as a crash
+      return { status: 0, text: '', error: String(err?.cause?.code || err?.message || err) };
+    }
+  }
 });
 
 // local LLM (Ollama / LM Studio): plain http to your own machine is allowed here

@@ -18,6 +18,7 @@ export async function apiCall<T = Record<string, unknown>>(payload: Record<strin
     try {
       if (desk) {
         const r = await desk.post(url, body);
+        if (r.error) throw new Error(r.error);
         text = r.text;
       } else {
         const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body, redirect: 'follow' });

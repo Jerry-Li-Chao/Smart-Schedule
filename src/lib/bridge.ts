@@ -3,7 +3,7 @@ export interface DeskAPI {
   platform: string;
   load(): Promise<string | null>;
   save(json: string): Promise<void>;
-  post(url: string, body: string): Promise<{ status: number; text: string }>;
+  post(url: string, body: string): Promise<{ status: number; text: string; error?: string }>;
   capture(text: string): void;
   onCapture(cb: (text: string) => void): void;
   hideCapture(): void;
