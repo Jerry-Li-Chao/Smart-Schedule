@@ -65,6 +65,7 @@ export const ItemCard = memo(function ItemCard({ item, today, project }: { item:
     <div
       className={cls('card', `lvl-${level}`, `st-${status}`, selected && 'selected', inMulti && 'multi', missed && 'missed')}
       data-card
+      data-key={itemKey(item)}
       draggable={!editing}
       onDragStart={(e) => startDrag(e, item.kind === 'occ' ? { kind: 'occ', id: t.id, date: item.date } : { kind: 'task', id: t.id })}
       onClick={(e) => {

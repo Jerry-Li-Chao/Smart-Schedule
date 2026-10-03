@@ -1078,3 +1078,11 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tt-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--k); box-shadow: 0 0 0 1.5px #fff; }
 .tt-row b { margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
 .tt-row.k-could i { background: #cbd5e1; }
+
+/* box select */
+.select-box { position: fixed; z-index: 60; pointer-events: none; border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 4px; }
+body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !important; }
+.wins-nav { display: flex; align-items: center; gap: 4px; }
+.wins-nav b { min-width: 150px; text-align: center; font-size: 13.5px; }
+.wins-nav .icon-btn:disabled { opacity: 0.3; }
+.wins-hint { margin: -6px 0 12px; font-size: 12.5px; color: var(--muted); background: var(--panel); border: 1px dashed var(--line-strong); border-radius: 10px; padding: 7px 12px; }

@@ -5,7 +5,7 @@ import {
 import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
 import { diffDays, fmtDay, fromISO, startOfWeekMon, addDays, MONTHS } from '../lib/date';
-import { computeStats, LEVELS, PERIOD_LABEL, type Period, type Stats, type Win } from '../lib/achievements';
+import { computeStats, LEVELS, periodRange, type Period, type Stats, type Win } from '../lib/achievements';
 import { effectiveLevel } from '../lib/priority';
 import { cls } from '../lib/id';
 import { Segmented } from './ui';
@@ -20,26 +20,54 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 export function Achievements({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
   const [period, setPeriod] = useState<Period>('week');
-  const stats = useMemo(() => computeStats(entities, period, today), [entities, period, today]);
+  const [offset, setOffset] = useState(0);
+  const stats = useMemo(() => computeStats(entities, period, today, offset), [entities, period, today, offset]);
+  const pick = (p: Period, o = 0) => (setPeriod(p), setOffset(o));
+  // early in a month, "this month" is shorter than "this week" — offer the last full month
+  const week = periodRange('week', today);
+  const youngMonth = period === 'month' && offset === 0 && stats.from > week.from;
+  const unit = { week: 'week', month: 'month', year: 'year' }[period];
 
   return (
     <div className="wins">
       <div className="wins-top">
         <Segmented
           value={period}
-          onChange={setPeriod}
+          onChange={(p) => pick(p)}
           options={[
-            { value: 'week', label: 'This week' },
-            { value: 'month', label: 'This month' },
-            { value: 'year', label: `This year` },
+            { value: 'week', label: 'Week' },
+            { value: 'month', label: 'Month' },
+            { value: 'year', label: 'Year' },
           ]}
         />
+        <div className="wins-nav">
+          <button className="icon-btn" title={`Previous ${unit}`} onClick={() => setOffset((o) => o - 1)}>
+            <ChevronLeft size={16} />
+          </button>
+          <b>{stats.label.now}</b>
+          <button className="icon-btn" title={`Next ${unit}`} disabled={offset >= 0} onClick={() => setOffset((o) => Math.min(0, o + 1))}>
+            <ChevronRight size={16} />
+          </button>
+          {offset < 0 && (
+            <button className="link-btn" onClick={() => setOffset(0)}>
+              Back to this {unit}
+            </button>
+          )}
+        </div>
         <span className="muted small">
           {fmtDay(stats.from, today)} – {fmtDay(stats.to, today)}
         </span>
       </div>
+      {youngMonth && (
+        <div className="wins-hint">
+          {stats.label.now} is only {plural(stats.days.length, 'day')} old — shorter than this week.{' '}
+          <button className="link-btn" onClick={() => setOffset(-1)}>
+            See last month in full →
+          </button>
+        </div>
+      )}
       <div className="wins-grid">
-        <Story key={period} stats={stats} today={today} />
+        <Story key={`${period}${offset}`} stats={stats} today={today} />
         <Dashboard stats={stats} today={today} />
       </div>
     </div>
@@ -179,7 +207,7 @@ function CountUp({ to, delay = 300, ms = 1100 }: { to: number; delay?: number; m
 function delta(stats: Stats) {
   const total = stats.wins.length;
   const prev = stats.prevTotal;
-  const label = PERIOD_LABEL[stats.period].prev;
+  const label = stats.label.prev;
   if (!prev) return total ? `Up from zero ${label}` : null;
   const pct = Math.round(((total - prev) / prev) * 100);
   if (pct === 0) return `Same as ${label}`;
@@ -188,7 +216,7 @@ function delta(stats: Stats) {
 
 function buildSlides(s: Stats, today: ISODate): Slide[] {
   const total = s.wins.length;
-  const now = PERIOD_LABEL[s.period].now;
+  const now = s.label.now;
   const slides: Slide[] = [];
 
   if (!total) {

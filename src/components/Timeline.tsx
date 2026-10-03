@@ -6,6 +6,7 @@ import { S, useStore } from '../store';
 import { addDays, diffDays, fromISO, MONTHS, WD, weekday } from '../lib/date';
 import { itemsFor } from '../lib/dayIndex';
 import { useDayIndex, useIsMobile } from '../lib/hooks';
+import { useBoxSelect } from '../lib/boxSelect';
 import { cls } from '../lib/id';
 import { capture, getProject, getTask, moveOccurrence, schedule, trackerUpdate } from '../actions';
 import { DRAG_MIME, ItemCard, type DragPayload } from './ItemCard';
@@ -213,6 +214,8 @@ export function Timeline({ today }: { today: ISODate }) {
   const totalCards = trackRows.reduce((s, r) => s + Math.round((r.h + 4) / (TRACK_CARD_H + 4)), 0);
   const tracksH = trackRows.length ? 32 + (tracksCollapsed ? 0 : tracksCapH) : 0;
   const pageH = Math.max(vh, (HEAD_H + tallest + tracksH + 40) * tz);
+
+  useBoxSelect(ref);
 
   return (
     <div className={cls('timeline', mobile && 'snap')} ref={ref} onScroll={onScroll} style={{ '--tlz': tz } as React.CSSProperties}>

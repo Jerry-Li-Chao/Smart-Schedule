@@ -26,6 +26,9 @@ export interface Habit {
 
 export interface Stats {
   period: Period;
+  /** 0 = the current period; −1 = the one before… */
+  offset: number;
+  label: { now: string; prev: string };
   from: ISODate;
   to: ISODate;
   days: ISODate[];
@@ -52,30 +55,32 @@ export interface Stats {
 }
 
 /**
- * Calendar periods, all ending today: this week (Mon–today), this month (1st–today), this year (Jan 1–today).
- * Each is compared with the same stretch of the previous week / month / year, so a Wednesday is
- * compared with last Mon–Wed, not with a whole week.
+ * Calendar periods. offset 0 = the current one, ending today (Mon–today, 1st–today, Jan 1–today),
+ * compared with the same stretch of the one before. offset −1, −2… = whole past weeks / months / years.
  */
-export function periodRange(p: Period, today: ISODate): { from: ISODate; to: ISODate; prevFrom: ISODate; prevTo: ISODate } {
-  if (p === 'week') {
-    const from = startOfWeekMon(today);
-    return { from, to: today, prevFrom: addDays(from, -7), prevTo: addDays(today, -7) };
+export function periodRange(p: Period, today: ISODate, offset = 0): { from: ISODate; to: ISODate; prevFrom: ISODate; prevTo: ISODate } {
+  const start0 = p === 'week' ? startOfWeekMon(today) : p === 'month' ? `${today.slice(0, 8)}01` : `${today.slice(0, 4)}-01-01`;
+  const shift = (d: ISODate, n: number) => (p === 'week' ? addDays(d, 7 * n) : addMonths(d, p === 'month' ? n : 12 * n));
+  const from = shift(start0, offset);
+  if (offset === 0) {
+    // same day last week / month / year, clamped (Mar 31 → Feb 28, Feb 29 → Feb 28)
+    return { from, to: today, prevFrom: shift(from, -1), prevTo: shift(today, -1) };
   }
-  if (p === 'month') {
-    const from = `${today.slice(0, 8)}01`;
-    // same day last month, clamped to its end (Mar 31 → Feb 1–28)
-    return { from, to: today, prevFrom: addMonths(from, -1), prevTo: addMonths(today, -1) };
-  }
-  const y = Number(today.slice(0, 4));
-  const prevTo = today.slice(5) === '02-29' ? `${y - 1}-02-28` : `${y - 1}${today.slice(4)}`;
-  return { from: `${y}-01-01`, to: today, prevFrom: `${y - 1}-01-01`, prevTo };
+  return { from, to: addDays(shift(from, 1), -1), prevFrom: shift(from, -1), prevTo: addDays(from, -1) };
 }
 
-export const PERIOD_LABEL: Record<Period, { now: string; prev: string }> = {
-  week: { now: 'This week', prev: 'this point last week' },
-  month: { now: 'This month', prev: 'this point last month' },
-  year: { now: 'This year', prev: 'this point last year' },
-};
+/** "This week" / "The week of Sep 21", and what it's compared with. */
+export function periodLabel(p: Period, today: ISODate, offset = 0): { now: string; prev: string } {
+  if (offset === 0)
+    return { week: { now: 'This week', prev: 'this point last week' }, month: { now: 'This month', prev: 'this point last month' }, year: { now: 'This year', prev: 'this point last year' } }[p];
+  const { from, prevFrom } = periodRange(p, today, offset);
+  const mon = (d: ISODate) => MONTH_NAMES[Number(d.slice(5, 7)) - 1];
+  if (p === 'week') return { now: offset === -1 ? 'Last week' : `The week of ${mon(from).slice(0, 3)} ${Number(from.slice(8))}`, prev: 'the week before' };
+  if (p === 'month') return { now: offset === -1 ? `Last month (${mon(from)})` : `${mon(from)} ${from.slice(0, 4)}`, prev: mon(prevFrom) };
+  return { now: offset === -1 ? `Last year (${from.slice(0, 4)})` : `In ${from.slice(0, 4)}`, prev: prevFrom.slice(0, 4) };
+}
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 
 /** a series' name without its trailing number placeholder ("Vitamin D #" → "Vitamin D") */
 const seriesName = (t: Task) => t.title.replace(/\s+#\s*$/, '').trim();
@@ -114,8 +119,8 @@ export function allWins(entities: Record<string, Entity>): Win[] {
   return out;
 }
 
-export function computeStats(entities: Record<string, Entity>, period: Period, today: ISODate): Stats {
-  const { from, to, prevFrom, prevTo } = periodRange(period, today);
+export function computeStats(entities: Record<string, Entity>, period: Period, today: ISODate, offset = 0): Stats {
+  const { from, to, prevFrom, prevTo } = periodRange(period, today, offset);
   const every = allWins(entities);
   const wins = every.filter((w) => w.date >= from && w.date <= to).sort((a, b) => a.date.localeCompare(b.date));
   const prevTotal = every.filter((w) => w.date >= prevFrom && w.date <= prevTo).length;
@@ -144,7 +149,7 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
   }
   let currentStreak = 0;
   // today not done yet doesn't break the streak
-  for (let d = perDay[today] ? today : addDays(today, -1); d >= from && perDay[d]; d = addDays(d, -1)) currentStreak++;
+  if (offset === 0) for (let d = perDay[today] ? today : addDays(today, -1); d >= from && perDay[d]; d = addDays(d, -1)) currentStreak++;
 
   const timed = wins.filter((w) => w.hour !== undefined);
   let chronotype: Stats['chronotype'] = null;
@@ -201,6 +206,8 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
 
   return {
     period,
+    offset,
+    label: periodLabel(period, today, offset),
     from,
     to,
     days,

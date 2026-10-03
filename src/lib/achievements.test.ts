@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeStats, computeTrend, periodRange } from './achievements';
+import { computeStats, computeTrend, periodLabel, periodRange } from './achievements';
 import type { Entity, Task } from '../types';
 
 const T = (p: Partial<Task>): Task => ({
@@ -25,6 +25,14 @@ describe('achievements', () => {
     expect(periodRange('month', today)).toMatchObject({ from: '2026-10-01', prevFrom: '2026-09-01', prevTo: '2026-09-02' });
     expect(periodRange('month', '2026-03-31')).toMatchObject({ prevFrom: '2026-02-01', prevTo: '2026-02-28' });
     expect(periodRange('year', today)).toMatchObject({ from: '2026-01-01', prevFrom: '2025-01-01', prevTo: '2025-10-02' });
+  });
+
+  it('steps back to whole past periods', () => {
+    expect(periodRange('month', today, -1)).toEqual({ from: '2026-09-01', to: '2026-09-30', prevFrom: '2026-08-01', prevTo: '2026-08-31' });
+    expect(periodRange('week', today, -1)).toEqual({ from: '2026-09-21', to: '2026-09-27', prevFrom: '2026-09-14', prevTo: '2026-09-20' });
+    expect(periodRange('year', today, -1)).toMatchObject({ from: '2025-01-01', to: '2025-12-31' });
+    expect(periodLabel('month', today, -1)).toEqual({ now: 'Last month (September)', prev: 'August' });
+    expect(periodLabel('week', today, -2).now).toBe('The week of Sep 14');
   });
 
   it('counts wins by importance, including days of repeating tasks', () => {
