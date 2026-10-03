@@ -180,7 +180,7 @@ export function TrendChart({ today }: { today: ISODate }) {
           )}
         </svg>
         {hp && (
-          <div className="tr-tip" style={{ left: Math.min(Math.max(x(hover!), 80), w - 80) }}>
+          <div className={cls('tr-tip', x(hover!) > w * 0.62 && 'flip')} style={x(hover!) > w * 0.62 ? { right: w - x(hover!) + 14 } : { left: x(hover!) + 14 }}>
             <div className="tt-date">{unit === 'day' ? md(hp.from) : hp.from === hp.to ? md(hp.from) : `${md(hp.from)} – ${md(hp.to)}`}</div>
             {shown.map((s) => (
               <div key={s.key} className={cls('tt-row', `k-${s.key}`)}>

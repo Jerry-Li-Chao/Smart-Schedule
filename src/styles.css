@@ -1069,15 +1069,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tr-cross { stroke: var(--line-strong); }
 .tr-dot { fill: var(--panel); stroke: var(--k); stroke-width: 2.5; }
 .tr-tip {
-  position: absolute; top: 4px; transform: translateX(-50%); pointer-events: none; min-width: 140px;
-  background: linear-gradient(155deg, #2e1065, #7c3aed 70%, #db2777); color: #fff; border-radius: 10px; padding: 8px 10px;
-  font-size: 12px; box-shadow: 0 10px 30px rgba(46, 16, 101, 0.35);
+  position: absolute; top: 4px; pointer-events: none; min-width: 140px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  color: var(--text); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px;
+  font-size: 12px; box-shadow: 0 6px 20px rgba(30, 25, 10, 0.12);
 }
 .tt-date { font-weight: 800; margin-bottom: 4px; }
 .tt-row { display: flex; align-items: center; gap: 6px; }
-.tt-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--k); box-shadow: 0 0 0 1.5px #fff; }
+.tt-row i { width: 8px; height: 8px; border-radius: 50%; background: var(--k); }
 .tt-row b { margin-left: auto; padding-left: 10px; font-variant-numeric: tabular-nums; }
-.tt-row.k-could i { background: #cbd5e1; }
 
 /* box select */
 .select-box { position: fixed; z-index: 60; pointer-events: none; border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 4px; }
@@ -1086,3 +1086,12 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .wins-nav b { min-width: 150px; text-align: center; font-size: 13.5px; }
 .wins-nav .icon-btn:disabled { opacity: 0.3; }
 .wins-hint { margin: -6px 0 12px; font-size: 12.5px; color: var(--muted); background: var(--panel); border: 1px dashed var(--line-strong); border-radius: 10px; padding: 7px 12px; }
+.plate-row { position: relative; }
+.plate-acts { display: none; gap: 4px; margin-left: auto; }
+.plate-row:hover .plate-acts { display: inline-flex; }
+.plate-row:hover .dl-meta { display: none; }
+.pa { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 99px; padding: 2px 8px; cursor: pointer; white-space: nowrap; }
+.pa:hover { border-color: var(--line-strong); }
+.pa.done:hover { background: var(--done-bg); color: var(--done); border-color: var(--done); }
+.pa.drop:hover { background: var(--drop-bg); }
+.app.mobile .plate-acts { display: inline-flex; }

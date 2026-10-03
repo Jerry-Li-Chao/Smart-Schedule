@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarCheck, ChevronLeft, ChevronRight, Flame, FolderKanban, Moon, Pause, Play, RotateCcw, Sparkles, Sun, Sunrise, Sunset, Target, Trophy,
+  Ban, Check, Clock, CalendarCheck, ChevronLeft, ChevronRight, Flame, FolderKanban, Moon, Pause, Play, RotateCcw, Sparkles, Sun, Sunrise, Sunset, Target, Trophy,
 } from 'lucide-react';
 import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
 import { diffDays, fmtDay, fromISO, startOfWeekMon, addDays, MONTHS } from '../lib/date';
 import { computeStats, LEVELS, periodRange, type Period, type Stats, type Win } from '../lib/achievements';
 import { effectiveLevel } from '../lib/priority';
+import { updateTask } from '../actions';
 import { cls } from '../lib/id';
 import { Segmented } from './ui';
 import { TrendChart } from './TrendChart';
@@ -584,6 +585,18 @@ function Heatmap({ stats, today }: { stats: Stats; today: ISODate }) {
 function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
   const [filter, setFilter] = useState<Importance | 'all'>('all');
   const open = (id: string) => S().setUI({ selectedId: id, occDate: undefined });
+  const [later, setLater] = useState<Record<string, number>>(loadLater);
+  // "deal with it later" sends a task to the back of the list (remembered on this device)
+  const plate = useMemo(() => {
+    const now = stats.left.overdue.filter((t) => !later[t.id]);
+    const back = stats.left.overdue.filter((t) => later[t.id]).sort((a, b) => later[a.id] - later[b.id]);
+    return [...now, ...back];
+  }, [stats.left.overdue, later]);
+  const deferId = (id: string) => setLater((l) => saveLater({ ...l, [id]: Date.now() }));
+  const close = (id: string, status: 'done' | 'dropped', title: string) => {
+    updateTask(id, { status }, status === 'done' ? `Done: “${title}”` : `Marked “${title}” obsolete`);
+    S().toast(status === 'done' ? `“${title}” done` : `“${title}” marked obsolete`, [{ label: 'Undo', run: () => S().undo() }]);
+  };
   const total = stats.wins.length;
   const d = delta(stats);
   const wins = [...stats.wins].reverse().filter((w) => filter === 'all' || w.importance === filter);
@@ -612,11 +625,22 @@ function Dashboard({ stats, today }: { stats: Stats; today: ISODate }) {
         </div>
         {left.overdue.length ? (
           <ul className="dash-list">
-            {left.overdue.slice(0, 8).map((t) => (
-              <li key={t.id} onClick={() => open(t.id)}>
+            {plate.slice(0, 8).map((t) => (
+              <li key={t.id} className="plate-row" onClick={() => open(t.id)}>
                 <span className={cls('si-dot', `lvl-${effectiveLevel(t, today).level}`)} />
                 <span className="dl-title">{t.title}</span>
                 {t.deadline && <span className="dl-meta">due {fmtDay(t.deadline, today)}</span>}
+                <span className="plate-acts" onClick={(e) => e.stopPropagation()}>
+                  <button className="pa done" title="Done" onClick={() => close(t.id, 'done', t.title)}>
+                    <Check size={13} /> Done
+                  </button>
+                  <button className="pa drop" title="No longer needed" onClick={() => close(t.id, 'dropped', t.title)}>
+                    <Ban size={12} /> Obsolete
+                  </button>
+                  <button className="pa" title="Deal with it later — move to the end of this list" onClick={() => deferId(t.id)}>
+                    <Clock size={12} /> Later
+                  </button>
+                </span>
               </li>
             ))}
             {left.overdue.length > 8 && <li className="dl-more">…and {left.overdue.length - 8} more</li>}
@@ -703,4 +727,21 @@ function dayLabel(d: ISODate, today: ISODate) {
   if (n === 1) return 'Yesterday';
   const x = fromISO(d);
   return n < 7 ? DAY_NAMES[(x.getDay() + 6) % 7].slice(0, 3) : `${MONTHS[x.getMonth()]} ${x.getDate()}`;
+}
+
+const LATER_KEY = 'planner.plateLater';
+function loadLater(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(LATER_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+function saveLater(l: Record<string, number>) {
+  try {
+    localStorage.setItem(LATER_KEY, JSON.stringify(l));
+  } catch {
+    /* storage blocked — keep it for this session */
+  }
+  return l;
 }
