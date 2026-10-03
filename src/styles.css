@@ -1106,3 +1106,8 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .tr-note { display: flex; gap: 7px; align-items: flex-start; font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
 .tr-note svg { flex-shrink: 0; margin-top: 2px; }
 .tt-imp { font-size: 11px; color: var(--muted); font-style: italic; margin-bottom: 3px; max-width: 170px; }
+.trend { --k-total: #3fae6a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .trend { --k-total: #5ccf8a; } }
+.k-total { --k: var(--k-total); }
+.tr-line.k-total { stroke-width: 3; opacity: 0.85; }
+.tt-row.tt-total { font-weight: 700; padding-bottom: 3px; margin-bottom: 2px; border-bottom: 1px dashed var(--line); }

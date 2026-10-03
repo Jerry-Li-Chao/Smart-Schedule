@@ -7,8 +7,9 @@ import { computeTrend, type TrendPoint, type TrendRange } from '../lib/achieveme
 import { cls } from '../lib/id';
 import { Segmented } from './ui';
 
-type SeriesKey = 'must' | 'should' | 'could' | 'left';
+type SeriesKey = 'total' | 'must' | 'should' | 'could' | 'left';
 const SERIES: { key: SeriesKey; label: string }[] = [
+  { key: 'total', label: 'All' },
   { key: 'must', label: 'Must' },
   { key: 'should', label: 'Should' },
   { key: 'could', label: 'Could' },
@@ -58,7 +59,9 @@ export function TrendChart({ today }: { today: ISODate }) {
   const [hover, setHover] = useState<number | null>(null);
   const [w, setW] = useState(600);
   const box = useRef<HTMLDivElement>(null);
-  const { unit, points, importDay } = useMemo(() => computeTrend(entities, range, today), [entities, range, today]);
+  const { unit, points: raw, importDay } = useMemo(() => computeTrend(entities, range, today), [entities, range, today]);
+
+  const points = useMemo(() => raw.map((p) => ({ ...p, total: p.must + p.should + p.could })), [raw]);
 
   useEffect(() => {
     const el = box.current;
@@ -79,7 +82,7 @@ export function TrendChart({ today }: { today: ISODate }) {
   const labelEvery = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(iw / 70))));
   const label = (p: TrendPoint) => (unit === 'month' ? `${MONTHS[fromISO(p.from).getMonth()]} ’${p.from.slice(2, 4)}` : md(p.from));
 
-  const totals = points.reduce((a, p) => ({ done: a.done + p.must + p.should + p.could, left: a.left + p.left }), { done: 0, left: 0 });
+  const totals = points.reduce((a, p) => ({ done: a.done + p.total, left: a.left + p.left }), { done: 0, left: 0 });
   const rate = totals.done + totals.left ? Math.round((totals.done / (totals.done + totals.left)) * 100) : null;
   const toggle = (k: SeriesKey) =>
     setHidden((h) => {
@@ -95,7 +98,8 @@ export function TrendChart({ today }: { today: ISODate }) {
     const i = points.findIndex((p) => importDay >= p.from && importDay <= p.to);
     if (i < 0) return null;
     const p = points[i];
-    const pos = i + (diffDays(p.from, importDay) + 1) / (diffDays(p.from, p.to) + 1);
+    // points sit at the start of each bucket, so the import day itself is at x(i)
+    const pos = i + diffDays(p.from, importDay) / (diffDays(p.from, p.to) + 1);
     return { x: x(Math.min(pos, points.length - 1)), beforeIdx: i };
   })();
   return (
@@ -194,7 +198,7 @@ export function TrendChart({ today }: { today: ISODate }) {
                 <path className="tr-line k-left" d={smooth(points.map((p, i) => [x(i), y(p.left)]))} />
               </>
             )}
-            {(['could', 'should', 'must'] as const)
+            {(['could', 'should', 'must', 'total'] as const)
               .filter((k) => !hidden.has(k))
               .map((k) => (
                 <path key={k} className={cls('tr-line', `k-${k}`)} d={smooth(points.map((p, i) => [x(i), y(p[k])]))} />
@@ -215,7 +219,7 @@ export function TrendChart({ today }: { today: ISODate }) {
             {shown.some((s) => s.key !== 'left') && <div className="tt-group">Done</div>}
             {imp && hover! < imp.beforeIdx + 1 && <div className="tt-imp">From the Google Sheet import — mostly counted as Could</div>}
             {shown.map((s) => (
-              <div key={s.key} className={cls('tt-row', `k-${s.key}`, s.key === 'left' && 'tt-sep')}>
+              <div key={s.key} className={cls('tt-row', `k-${s.key}`, s.key === 'left' && 'tt-sep', s.key === 'total' && 'tt-total')}>
                 <i />
                 {s.label}
                 <b>{hp[s.key]}</b>
