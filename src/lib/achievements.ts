@@ -192,7 +192,7 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
   const dropped = tasks.filter((t) => !t.recurrence && t.status === 'dropped' && t.date && t.date >= from && t.date <= to).length;
 
   const rank: Record<Importance, number> = { must: 0, should: 1, could: 2 };
-  const open = tasks.filter((t) => !t.recurrence && !isClosed(t) && !t.someday && t.date && t.date <= today);
+  const open = tasks.filter((t) => !t.recurrence && !isClosed(t) && t.date && t.date <= today);
   const leftLevel: Record<Importance, number> = { must: 0, should: 0, could: 0 };
   for (const t of open) leftLevel[effectiveLevel(t, today).level]++;
   const overdue = open
@@ -224,7 +224,7 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
     habits,
     projects,
     dropped,
-    left: { byLevel: leftLevel, overdue, inbox: tasks.filter((t) => t.date === null && !t.someday && !t.projectId && !t.recurrence && !isClosed(t)).length, nextMusts },
+    left: { byLevel: leftLevel, overdue, inbox: tasks.filter((t) => t.date === null && !t.projectId && !t.recurrence && !isClosed(t)).length, nextMusts },
   };
 }
 
@@ -302,7 +302,7 @@ export function computeTrend(entities: Record<string, Entity>, range: TrendRange
       continue;
     }
     const planned = t.date;
-    if (!planned || planned >= today || t.someday) continue;
+    if (!planned || planned >= today) continue;
     const p = find(planned);
     if (!p) continue;
     const doneDay = t.status === 'done' ? (t.doneAt && !dayOnly(t) ? toISO(new Date(t.doneAt)) : t.date) : null;

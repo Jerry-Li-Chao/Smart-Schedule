@@ -70,9 +70,6 @@ describe('parseQuick', () => {
     expect(p('3个月后 体检').date).toBe('2027-01-01');
   });
 
-  it('marks someday ideas', () => {
-    expect(p('idea: an app that records meetings')).toMatchObject({ someday: true, title: 'an app that records meetings' });
-  });
 
   it('"by" sets a deadline', () => {
     expect(p('submit report by 10/10')).toMatchObject({ date: '2026-10-10', deadline: '2026-10-10', title: 'submit report' });

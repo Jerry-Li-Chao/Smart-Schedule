@@ -47,7 +47,7 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
   const rawOcc = occDate ? t.completions?.[occDate] : undefined;
   const occState = rawOcc === 'deleted' || rawOcc === 'moved' ? undefined : rawOcc;
 
-  const where = t.recurrence ? 'Repeating' : t.projectId ? 'Project step' : t.date ? relDay(t.date, today) : t.someday ? 'Someday idea' : 'On the sticky';
+  const where = t.recurrence ? 'Repeating' : t.projectId ? 'Project step' : t.date ? relDay(t.date, today) : 'On the sticky';
 
   return (
     <aside className="drawer">

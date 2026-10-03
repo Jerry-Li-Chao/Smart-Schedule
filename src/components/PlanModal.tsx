@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { GitBranch, Lightbulb, Trash2, X, Clock, Sparkles } from 'lucide-react';
+import { GitBranch, Trash2, X, Clock, Sparkles } from 'lucide-react';
 import type { Importance, ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, fmtDay, fmtMD, nextMonday, weekendOf } from '../lib/date';
@@ -106,9 +106,6 @@ function InboxDecision({ t, today, done, later }: { t: Task; today: ISODate; don
         <DateButton className="btn big as-btn" onPick={(d) => done(() => sched(t, d))}>Pick a day…</DateButton>
       </div>
       <div className="plan-alt">
-        <button className="btn ghost" onClick={() => done(() => updateTask(t.id, { someday: true }, `Parked “${t.title}” as an idea`))}>
-          <Lightbulb size={14} /> Just an idea → someday
-        </button>
         <button className="btn ghost" onClick={() => done(() => promoteToProject(t.id))}>
           <GitBranch size={14} /> Bigger — make a project
         </button>

@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ChevronsLeft, GitBranch, Lightbulb, Sparkles, StickyNote, X } from 'lucide-react';
+import { ChevronsLeft, GitBranch, Sparkles, StickyNote, X } from 'lucide-react';
 import type { ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, nextMonday, weekendOf } from '../lib/date';
-import { isClosed } from '../lib/priority';
 import { cls } from '../lib/id';
 import { capture, deleteEntity, getTask, isInbox, promoteToProject, schedule, updateTask } from '../actions';
 import { DRAG_MIME, InlineRename } from './ItemCard';
@@ -20,13 +19,13 @@ function age(ms: number) {
 export function StickyInbox({ today, collapsible }: { today: ISODate; collapsible?: boolean }) {
   const collapsed = useStore((s) => !!collapsible && !!s.settings.stickyCollapsed);
   const entities = useStore((s) => s.entities);
-  const { inbox, someday } = useMemo(() => {
-    const all = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
-    return {
-      inbox: all.filter(isInbox).sort((a, b) => a.createdAt - b.createdAt),
-      someday: all.filter((t) => t.someday && !t.date && !isClosed(t)).sort((a, b) => b.createdAt - a.createdAt),
-    };
-  }, [entities]);
+  const inbox = useMemo(
+    () =>
+      Object.values(entities)
+        .filter((e): e is Task => e.type === 'task' && isInbox(e))
+        .sort((a, b) => a.createdAt - b.createdAt),
+    [entities],
+  );
   const [v, setV] = useState('');
   const [over, setOver] = useState(false);
 
@@ -55,9 +54,9 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
         return;
       }
       const t = getTask(p.id);
-      if (!t || (t.date === null && !t.someday)) return;
+      if (!t || t.date === null) return;
       if (t.recurrence) return S().toast('Repeating tasks stay on the calendar.');
-      updateTask(t.id, { date: null, someday: false }, `Put “${t.title}” back on the sticky`);
+      updateTask(t.id, { date: null }, `Put “${t.title}” back on the sticky`);
       S().toast(t.projectId ? `Unscheduled “${t.title}” — it’s waiting in its project` : `“${t.title}” is back on the sticky`, [{ label: 'Undo', run: () => S().undo() }]);
     },
   };
@@ -121,18 +120,6 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
         ))}
         {!inbox.length && <li className="sticky-empty">All planned. Nice.</li>}
       </ul>
-      {someday.length > 0 && (
-        <details className="someday">
-          <summary>
-            <Lightbulb size={13} /> Someday / ideas ({someday.length})
-          </summary>
-          <ul className="sticky-list">
-            {someday.map((t) => (
-              <StickyItem key={t.id} t={t} today={today} />
-            ))}
-          </ul>
-        </details>
-      )}
     </aside>
   );
 }
@@ -144,7 +131,7 @@ function StickyItem({ t, today }: { t: Task; today: ISODate }) {
   const go = (d: ISODate) => schedule(t.id, d);
   return (
     <li
-      className={cls('sticky-item', selected && 'selected', old && !t.someday && 'aging')}
+      className={cls('sticky-item', selected && 'selected', old && 'aging')}
       draggable={!editing}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'task', id: t.id }));
@@ -171,11 +158,6 @@ function StickyItem({ t, today }: { t: Task; today: ISODate }) {
         <button onClick={() => go(nextMonday(today))}>Next wk</button>
         <DateButton onPick={go} />
         <span className="spacer" />
-        {!t.someday && (
-          <button className="icon-btn" title="Someday / just an idea" onClick={() => updateTask(t.id, { someday: true }, `Moved “${t.title}” to someday`)}>
-            <Lightbulb size={13} />
-          </button>
-        )}
         <button className="icon-btn" title="Bigger than a task — make it a project with steps" onClick={() => promoteToProject(t.id)}>
           <GitBranch size={13} />
         </button>

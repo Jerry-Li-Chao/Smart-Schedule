@@ -27,7 +27,7 @@ export function getProject(id?: string): Project | undefined {
   return e?.type === 'project' && !e.deleted ? e : undefined;
 }
 export const isInbox = (t: Task) =>
-  !t.deleted && t.date === null && !t.someday && !t.projectId && !t.recurrence && !isClosed(t);
+  !t.deleted && t.date === null && !t.projectId && !t.recurrence && !isClosed(t);
 
 /** Things waiting for a decision: unscheduled sticky notes. */
 export function planQueue(): Task[] {
@@ -92,7 +92,6 @@ export function taskFromParsed(p: Parsed, extra: Partial<Task> = {}): Task {
     importance: p.importance ?? S().settings.defaultImportance ?? 'must',
     recurrence: p.recurrence,
     deadline: p.deadline,
-    someday: p.someday,
     remindAt: defaultReminder(date, p.time, today),
     ...extra,
   });
@@ -140,7 +139,6 @@ export function updateTask(id: string, patch: Partial<Task>, label?: string) {
     next.stay = undefined; // rescheduled by hand: normal carry-over again
     if (!patch.date) next.firstScheduled = undefined;
     else if (!t.firstScheduled || !t.date) next.firstScheduled = patch.date;
-    if (patch.date && t.someday) next.someday = false;
   }
   if (('date' in patch || 'time' in patch) && !('remindAt' in patch) && t.remindAt && t.remindAt === defaultReminder(t.date, t.time, todayISO())) {
     next.remindAt = defaultReminder(next.date, next.time, todayISO());

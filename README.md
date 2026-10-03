@@ -83,7 +83,6 @@ On a phone, the Days tab swipes one day at a time and the Sticky tab has one-tap
 | `every day` `every weekday` `every mon, wed and fri` `every 2 weeks` `every month` `every 25th` | repeating |
 | `今天` `明天` `后天` `周五` `下周三` `3个月后` `下午3点` `每天` `每周一` `每月15号` | Chinese equivalents |
 | `Spanish L# every mon, wed and fri` · `Vitamin D #42 every day` | numbered repeats: L1, L2, L3… / Vitamin D 42, 43, 44… |
-| `idea: …` | straight to Someday / ideas |
 | Pasting a numbered list | one note per number; `- sub-bullets` become that note's notes (and its steps if you make it a project) |
 
 ## Local AI

@@ -16,7 +16,6 @@ export interface Parsed {
   importance?: Importance;
   recurrence?: Recurrence;
   deadline?: ISODate;
-  someday?: boolean;
 }
 
 const WD_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -58,9 +57,6 @@ export function parseQuick(input: string, today: ISODate): Parsed {
   };
   let byDeadline = false;
 
-  // someday / idea
-  take(/^\s*(?:idea|someday|想法)\s*[:：]\s*/i, () => { out.someday = true; });
-  take(/\s#?someday(?=\s)/i, () => { out.someday = true; });
 
 
   // ---- recurrence ----

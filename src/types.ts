@@ -24,7 +24,7 @@ export interface Task extends Base {
   type: 'task';
   title: string;
   notes?: string;
-  /** Scheduled day. null = still on the sticky (inbox) or a someday idea. */
+  /** Scheduled day. null = still on the sticky (inbox). */
   date: ISODate | null;
   /** HH:MM — a task with a time is an appointment and is never carried over. */
   time?: string;
@@ -37,6 +37,7 @@ export interface Task extends Base {
   remindFired?: boolean;
   /** First day this was planned for — used to show how long it has been carried. */
   firstScheduled?: ISODate;
+  /** retired: ideas are ordinary sticky notes now; kept so older data still loads */
   someday?: boolean;
   projectId?: string;
   parentId?: string | null;

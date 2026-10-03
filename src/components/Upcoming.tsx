@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { AlarmClock, CalendarRange, Hourglass, Lightbulb, Repeat } from 'lucide-react';
+import { AlarmClock, CalendarRange, Hourglass, Repeat } from 'lucide-react';
 import type { ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, diffDays, fmtDay, fromISO, MONTHS, relDay } from '../lib/date';
 import { describeRecurrence, nextOccurrence } from '../lib/recurrence';
 import { isClosed } from '../lib/priority';
 import { cls } from '../lib/id';
-import { capture, jumpTo, schedule } from '../actions';
-import { DateButton, Empty, isSubmitKey } from './ui';
+import { capture, jumpTo } from '../actions';
+import { Empty, isSubmitKey } from './ui';
 
 /** The part a day-column sheet can't do: things months away, repeating things, things you're waiting on. */
 export function Upcoming({ today }: { today: ISODate }) {
@@ -28,7 +28,6 @@ export function Upcoming({ today }: { today: ISODate }) {
       deadlines: open.filter((t) => t.deadline && t.deadline >= today).sort((a, b) => a.deadline!.localeCompare(b.deadline!)).slice(0, 12),
       series: all.filter((t) => t.recurrence && t.date).map((t) => ({ t, next: nextOccurrence(t.recurrence!, t.date!, today) })).filter((x) => x.next).sort((a, b) => a.next!.localeCompare(b.next!)),
       waiting: open.filter((t) => t.status === 'waiting'),
-      someday: open.filter((t) => t.someday && !t.date),
     };
   }, [entities, today]);
 
@@ -112,17 +111,6 @@ export function Upcoming({ today }: { today: ISODate }) {
             <div key={t.id} className="up-row" onClick={() => open(t)}>
               <span className="up-title">{t.title}</span>
               <span className="tiny muted">{describeRecurrence(t.recurrence!, t.date!)} · next {relDay(next!, today)}</span>
-            </div>
-          ))}
-
-          <h3><Lightbulb size={15} /> Someday / ideas</h3>
-          {!d.someday.length && <Empty>Ideas you park from the sticky land here.</Empty>}
-          {d.someday.map((t) => (
-            <div key={t.id} className="up-row" onClick={() => open(t)}>
-              <span className="up-title">{t.title}</span>
-              <span onClick={(e) => e.stopPropagation()}>
-                <DateButton onPick={(dt) => schedule(t.id, dt)} title="Give it a day" />
-              </span>
             </div>
           ))}
         </section>
