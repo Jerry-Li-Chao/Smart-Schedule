@@ -17,7 +17,8 @@ export function useBoxSelect(ref: React.RefObject<HTMLElement | null>) {
       if (e.button !== 0 || !(e.target instanceof Element) || e.target.closest(NOT_FROM)) return;
       const x0 = e.clientX;
       const y0 = e.clientY;
-      const base = e.metaKey || e.ctrlKey || e.shiftKey ? S().ui.multi ?? [] : [];
+      const additive = e.metaKey || e.ctrlKey || e.shiftKey;
+      const base = additive ? S().ui.multi ?? [] : [];
       let box: HTMLDivElement | null = null;
       let last = '';
 
@@ -51,7 +52,13 @@ export function useBoxSelect(ref: React.RefObject<HTMLElement | null>) {
       const up = () => {
         window.removeEventListener('mousemove', move);
         window.removeEventListener('mouseup', up);
-        if (!box) return;
+        if (!box) {
+          // A plain click on empty space drops the selection. The day column already saw the
+          // selection at mousedown, so its own handler skips "add a task" — this click only
+          // deselects. ⌘/Shift is held to extend a selection, so it must keep it.
+          if (!additive && S().ui.multi?.length) S().setUI({ multi: undefined, selectedId: undefined, occDate: undefined });
+          return;
+        }
         box.remove();
         document.body.classList.remove('boxing');
         // the click that ends a drag must not open "add a task"
