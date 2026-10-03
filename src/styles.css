@@ -1109,3 +1109,4 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .k-total { --k: var(--k-total); }
 .tr-line.k-total { stroke-width: 3; opacity: 0.85; }
 .tt-row.tt-total { font-weight: 700; padding-bottom: 3px; margin-bottom: 2px; border-bottom: 1px dashed var(--line); }
+.sticky-item.multi { background: var(--sticky-2); outline: 2px solid var(--accent); outline-offset: -1px; }

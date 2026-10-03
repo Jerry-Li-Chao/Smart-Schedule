@@ -21,7 +21,7 @@ export function itemStatus(item: DayItem): Status {
   return item.entry.outcome === 'pending' ? 'open' : 'done';
 }
 
-function startDrag(e: React.DragEvent, p: DragPayload) {
+export function startDrag(e: React.DragEvent, p: DragPayload) {
   // dragging one card of a selection carries the whole selection
   const multi = S().ui.multi ?? [];
   const key = p.kind === 'task' ? p.id : p.kind === 'occ' ? `${p.id}@${p.date}` : '';

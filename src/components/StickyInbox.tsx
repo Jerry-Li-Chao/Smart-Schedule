@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ChevronsLeft, GitBranch, Sparkles, StickyNote, X } from 'lucide-react';
 import type { ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, nextMonday, weekendOf } from '../lib/date';
 import { cls } from '../lib/id';
-import { capture, deleteEntity, getTask, isInbox, promoteToProject, schedule, updateTask } from '../actions';
-import { DRAG_MIME, InlineRename } from './ItemCard';
+import { capture, deleteEntity, getTask, isInbox, promoteToProject, schedule, updateTask, toggleMulti } from '../actions';
+import { DRAG_MIME, InlineRename, startDrag } from './ItemCard';
+import { useBoxSelect } from '../lib/boxSelect';
 import { DateButton, isSubmitKey } from './ui';
 
 function age(ms: number) {
@@ -28,6 +29,8 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
   );
   const [v, setV] = useState('');
   const [over, setOver] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  useBoxSelect(ref);
 
   const submit = () => {
     if (!v.trim()) return;
@@ -49,7 +52,10 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
       setOver(false);
       const p = JSON.parse(e.dataTransfer.getData(DRAG_MIME) || '{}');
       if (p.kind !== 'task') {
-        if (p.kind === 'many') S().toast('Put tasks back on the sticky one at a time.');
+        if (p.kind === 'many') {
+          // dragged out of the sticky and dropped back: nothing to do
+          if (!p.keys.every((k: string) => getTask(k)?.date === null)) S().toast('Put tasks back on the sticky one at a time.');
+        }
         else if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
         return;
       }
@@ -72,7 +78,7 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
     );
 
   return (
-    <aside className={cls('sticky', over && 'drop-over')} {...drop}>
+    <aside ref={ref} className={cls('sticky', over && 'drop-over')} {...drop}>
       {over && <div className="drop-hint">Drop to unschedule — back on the sticky</div>}
       <div className="sticky-head">
         <StickyNote size={15} />
@@ -126,18 +132,21 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
 
 function StickyItem({ t, today }: { t: Task; today: ISODate }) {
   const selected = useStore((s) => s.ui.selectedId === t.id);
+  const inMulti = useStore((s) => !!s.ui.multi?.includes(t.id));
   const [editing, setEditing] = useState(false);
   const old = Date.now() - t.createdAt > 86400000;
   const go = (d: ISODate) => schedule(t.id, d);
   return (
     <li
-      className={cls('sticky-item', selected && 'selected', old && 'aging')}
+      className={cls('sticky-item', selected && 'selected', inMulti && 'multi', old && 'aging')}
+      data-card
+      data-key={t.id}
       draggable={!editing}
-      onDragStart={(e) => {
-        e.dataTransfer.setData(DRAG_MIME, JSON.stringify({ kind: 'task', id: t.id }));
-        e.dataTransfer.effectAllowed = 'move';
+      onDragStart={(e) => startDrag(e, { kind: 'task', id: t.id })}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return toggleMulti(t.id);
+        S().setUI({ selectedId: t.id, occDate: undefined, multi: undefined });
       }}
-      onClick={() => S().setUI({ selectedId: t.id, occDate: undefined })}
     >
       <div className="si-text">
         <span className={cls('si-dot', `lvl-${t.importance}`)} />
