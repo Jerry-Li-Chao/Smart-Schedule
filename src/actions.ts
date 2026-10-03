@@ -186,6 +186,34 @@ export function moveOccurrence(series: Task, from: ISODate, to: ISODate) {
   S().commit(`Moved one “${series.title}” → ${fmtDay(to)}`, [{ ...series, completions }, copy]);
 }
 
+/**
+ * Move a whole selection to one day in a single undoable step. One-off tasks go to the end of
+ * that day in their current order; days of a repeating task move as one-off copies.
+ */
+export function moveMany(keys: string[], to: ISODate) {
+  const changed = new Map<string, Task>();
+  const created: Task[] = [];
+  let order = Date.now();
+  let n = 0;
+  for (const k of keys) {
+    const [id, date] = k.split('@');
+    const t = changed.get(id) ?? getTask(id);
+    if (!t) continue;
+    if (date) {
+      if (date === to) continue;
+      changed.set(id, { ...t, completions: { ...(t.completions ?? {}), [date]: 'moved' } });
+      created.push(newTask({ title: numberedTitle(t, date), notes: t.notes, importance: t.importance, time: t.time, date: to, seriesId: t.id, projectId: t.projectId }));
+      n++;
+    } else if (!t.recurrence && t.date !== to) {
+      changed.set(id, { ...t, date: to, order: order++, stay: undefined });
+      n++;
+    }
+  }
+  if (!n) return;
+  S().commit(`Moved ${n} task${n > 1 ? 's' : ''} → ${fmtDay(to)}`, [...changed.values(), ...created]);
+  S().toast(`Moved ${n} task${n > 1 ? 's' : ''} to ${fmtDay(to)}`, [{ label: 'Undo', run: () => S().undo() }]);
+}
+
 export function deleteEntity(id: string) {
   const e = S().entities[id];
   if (!e) return;

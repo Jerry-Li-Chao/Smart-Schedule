@@ -12,7 +12,8 @@ export const DRAG_MIME = 'text/x-planner';
 export type DragPayload =
   | { kind: 'task'; id: string }
   | { kind: 'occ'; id: string; date: ISODate }
-  | { kind: 'follow'; projectId: string; entryId: string };
+  | { kind: 'follow'; projectId: string; entryId: string }
+  | { kind: 'many'; keys: string[] };
 
 export function itemStatus(item: DayItem): Status {
   if (item.kind === 'occ') return item.state ?? 'open';
@@ -21,6 +22,18 @@ export function itemStatus(item: DayItem): Status {
 }
 
 function startDrag(e: React.DragEvent, p: DragPayload) {
+  // dragging one card of a selection carries the whole selection
+  const multi = S().ui.multi ?? [];
+  const key = p.kind === 'task' ? p.id : p.kind === 'occ' ? `${p.id}@${p.date}` : '';
+  if (key && multi.length > 1 && multi.includes(key)) {
+    p = { kind: 'many', keys: multi };
+    const ghost = document.createElement('div');
+    ghost.className = 'drag-count';
+    ghost.textContent = `${multi.length} tasks`;
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, 20, 16);
+    setTimeout(() => ghost.remove(), 0);
+  }
   e.dataTransfer.setData(DRAG_MIME, JSON.stringify(p));
   e.dataTransfer.effectAllowed = 'move';
 }

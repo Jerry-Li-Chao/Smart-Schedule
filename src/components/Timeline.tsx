@@ -8,7 +8,7 @@ import { itemsFor } from '../lib/dayIndex';
 import { useDayIndex, useIsMobile } from '../lib/hooks';
 import { useBoxSelect } from '../lib/boxSelect';
 import { cls } from '../lib/id';
-import { capture, getProject, getTask, moveOccurrence, schedule, trackerUpdate } from '../actions';
+import { capture, getProject, getTask, moveMany, moveOccurrence, schedule, trackerUpdate } from '../actions';
 import { DRAG_MIME, ItemCard, type DragPayload } from './ItemCard';
 
 const COL_W = 252;
@@ -433,6 +433,10 @@ function orderOf(it?: DayItem) {
 function handleDrop(p: DragPayload, date: ISODate, index: number, items: DayItem[]) {
   if (p.kind === 'follow') {
     trackerUpdate(p.projectId, (es) => es.map((x) => (x.id === p.entryId ? { ...x, followUp: date } : x)), 'Moved follow-up');
+    return;
+  }
+  if (p.kind === 'many') {
+    moveMany(p.keys, date);
     return;
   }
   if (p.kind === 'occ') {

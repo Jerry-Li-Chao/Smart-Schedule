@@ -50,7 +50,8 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
       setOver(false);
       const p = JSON.parse(e.dataTransfer.getData(DRAG_MIME) || '{}');
       if (p.kind !== 'task') {
-        if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
+        if (p.kind === 'many') S().toast('Put tasks back on the sticky one at a time.');
+        else if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
         return;
       }
       const t = getTask(p.id);
