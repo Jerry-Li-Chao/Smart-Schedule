@@ -54,10 +54,12 @@ th { font-size: 11.5px; color: var(--muted); font-weight: 700; text-transform: u
 .num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
 mark { background: color-mix(in srgb, #facc15 50%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
 .dp { font: 12px var(--mono); border-collapse: collapse; margin-top: 8px; }
-.dp td, .dp th { width: 30px; height: 26px; text-align: center; border: 1px solid var(--line); padding: 0; }
+.dp td, .dp th { width: 30px; height: 26px; text-align: center; border: 1px solid var(--line); padding: 0; vertical-align: middle; }
 .dp th { background: var(--bg); color: var(--muted); text-transform: none; }
 .dp td.path { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
 .dp td.final { background: var(--accent); color: #fff; }
+.dp td.src { outline: 2px solid var(--amber); outline-offset: -2px; }
+.dp td:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
 .bar { height: 18px; border-radius: 4px; background: var(--accent); min-width: 2px; }
 .bar.related { background: var(--purple); }
 .bar.below { background: color-mix(in srgb, var(--muted) 45%, transparent); }
@@ -107,34 +109,62 @@ canvas { width: 100%; max-width: 420px; aspect-ratio: 1; border-radius: 12px; ba
 <p class="lede">No AI. The goal: find <i>Renew passport</i> when you type <code>pasport</code>, <code>pass</code> or <code>renewing</code>, in about a millisecond.</p>
 
 <div class="card">
-  <div class="try">Step 1 · Try it</div>
+  <div class="try">Step 1 · Pick or type a task title</div>
   <h3>Text → terms (tokenizing)</h3>
-  <p class="small muted">Lower-case, strip accents, split into words, chop common endings (“stemming”). Chinese has no spaces, so it becomes single characters <span class="chip bonus">+ pairs</span> of neighbours.</p>
-  <input type="text" id="tokIn" value="Renewals for 2 passports · 看牙医 Café" />
-  <div class="chips" id="tokOut"></div>
-  <div class="small muted" id="tokNote"></div>
+  <p class="small muted">Before anything can be searched, every task title is broken into <b>terms</b> — the small, standardised pieces the search actually compares. Your search box text goes through <i>exactly the same steps</i>, so two different spellings of a word end up as the same term and match.</p>
+  <div class="row small" style="margin-bottom:6px">Example titles: <button class="ex tokEx">Renewals for 2 passports</button><button class="ex tokEx">Renewing my passport</button><button class="ex tokEx">看牙医</button><button class="ex tokEx">周末和朋友去超市买菜</button><button class="ex tokEx">Café meeting</button></div>
+  <input type="text" id="tokIn" value="Renewals for 2 passports" />
+  <div class="small" id="tokSum" style="margin-top:8px"></div>
+  <table style="margin-top:8px"><thead><tr><th>piece of the text</th><th>stored as term</th><th>what happened</th></tr></thead><tbody id="tokOut"></tbody></table>
+  <p class="small muted" style="margin-top:8px">Colours: <span class="chip">blue</span> = an ordinary term (a word, or one Chinese character). <span class="chip bonus">purple</span> = a bonus term for two neighbouring Chinese characters — Chinese has no spaces, so the search can't tell where words end; storing pairs lets <code>牙医</code> score higher on a task containing exactly <code>牙医</code> than on one where 牙 and 医 are far apart.</p>
+  <div class="small" id="tokNote"></div>
 </div>
 
 <div class="card">
-  <div class="try">Step 2 · Click a term</div>
-  <h3>The inverted index</h3>
-  <p class="small muted">Instead of scanning every task per search, build a map <b>term → tasks containing it</b>, once. The number is the field weight: title 3, project/repeat 1.5, notes 1. Add a task and watch the index update.</p>
+  <div class="try">Step 2 · Look up a word</div>
+  <h3>The inverted index — like the index at the back of a book</h3>
+  <p class="small muted">Reading every task on every keystroke would be slow. Instead, the terms from step 1 are collected <b>once</b> into a lookup table: <b>term → which tasks contain it, and where</b>. A search then just looks its terms up — like finding “passport” in a book's index instead of reading the whole book.</p>
+  <div class="row"><span class="small">Look up:</span><input type="text" id="lookIn" value="renewing" style="max-width:220px" /><span class="small muted">or click any row of the table</span></div>
+  <div class="small" id="lookOut" style="margin:8px 0"></div>
   <div class="grid2">
     <div>
-      <div class="small muted" style="margin-bottom:4px">Sample planner</div>
+      <div class="small muted" style="margin-bottom:4px">The sample tasks (highlighted = contains the selected term)</div>
       <div id="docList"></div>
       <div class="row" style="margin-top:8px"><input type="text" id="addIn" placeholder="Add a task, e.g. Pay the electricity bill" /><button id="addBtn">Add</button></div>
+      <div class="small muted">Adding a task adds its terms to the table straight away.</div>
     </div>
-    <div class="term-list"><table><thead><tr><th>term</th><th>tasks (weight)</th><th class="num">IDF</th></tr></thead><tbody id="idxBody"></tbody></table></div>
+    <div class="term-list"><table><thead><tr><th>term</th><th>found in</th></tr></thead><tbody id="idxBody"></tbody></table></div>
   </div>
+  <p class="small muted">“Where” matters: a word in the <b>title</b> counts 3×, in the project / repeat rule 1.5×, in the notes 1× — a task named “Passport” is a better match than one that mentions a passport in its notes.</p>
 </div>
 
 <div class="card">
   <div class="try">Step 3 · Edit the words</div>
   <h3>Typos: edit distance</h3>
-  <p class="small muted">The minimum number of single-letter inserts, deletes, replacements (or swaps of neighbours) to turn one word into the other. Each cell = best cost so far; the bottom-right cell is the answer. Words of 4–6 letters may have 1 typo, 7+ letters 2.</p>
-  <div class="row"><input type="text" id="edA" value="pasport" style="max-width:200px" /><input type="text" id="edB" value="passport" style="max-width:200px" /><span id="edOut" class="kpi"></span></div>
-  <div style="overflow:auto"><table class="dp" id="dp"></table></div>
+  <p class="small muted"><b>Why we need it.</b> Step 2 only finds terms that are spelled <i>exactly</i> right. Type <code>pasport</code> and step 1 turns it into the term <code>pasport</code> — which no task contains, so the lookup finds nothing. To forgive typos, the search compares your term with the terms in the index and keeps those that are only one or two letters off. “How many letters off” is the <b>edit distance</b>: the fewest single-letter changes — insert one, delete one, replace one, or swap two neighbours — that turn one word into the other.</p>
+  <div class="small" id="edNear" style="margin:6px 0 10px"></div>
+  <div class="row"><span class="small">Compare</span><input type="text" id="edA" value="pasport" style="max-width:180px" /><span class="small">with</span><input type="text" id="edB" value="passport" style="max-width:180px" /><span id="edOut" class="kpi"></span></div>
+  <div class="small" id="edSteps" style="margin:6px 0"></div>
+  <div class="grid2" style="align-items:start">
+    <div style="overflow:auto"><table class="dp" id="dp"></table><div class="small muted" style="margin-top:6px"><span style="outline:2px solid var(--accent);outline-offset:-2px;padding:0 4px">blue outline</span> = the cell you're pointing at · <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange outline</span> = the cell its value came from · <span style="background:var(--accent-soft);padding:0 4px">blue fill</span> = the path to the answer</div></div>
+    <div class="small" id="edCell" style="min-height:120px"></div>
+  </div>
+  <div class="small muted" style="margin-top:8px">
+    <p><b>How the table works.</b> Rows are the letters of the first word, columns the letters of the second. The cell in row <i>i</i>, column <i>j</i> answers a smaller question: <i>how many edits turn the first i letters of the first word into the first j letters of the second?</i> The top row and left column are easy (from nothing to 3 letters = 3 inserts). Every other cell is the cheapest of three moves from a cell already worked out:</p>
+    <ul style="margin:0 0 6px;padding-left:18px">
+      <li><b>Move diagonally</b>, from the cell one up and one left <i>to</i> this cell: both words gain one letter. Free (+0) if the two new letters are the same; +1 if they differ (replace one with the other).</li>
+      <li><b>Move down</b>, from the cell directly above <i>to</i> this cell: only the first word gains a letter, so that letter has to be <i>deleted</i>, +1.</li>
+      <li><b>Move right</b>, from the cell directly to the left <i>to</i> this cell: only the second word gains a letter, so it has to be <i>inserted</i>, +1.</li>
+    </ul>
+    <p>As a formula, with <code>A</code> the first word, <code>B</code> the second and <code>D[i][j]</code> the cell in row <i>i</i>, column <i>j</i>:</p>
+    <pre class="mono" style="background:var(--bg);padding:8px 10px;border-radius:6px;overflow:auto;margin:0 0 6px">D[0][j] = j          D[i][0] = i
+D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or replace
+               D[i-1][j]   + 1,                        // down: delete A[i]
+               D[i][j-1]   + 1,                        // right: insert B[j]
+               D[i-2][j-2] + 1  if A[i-1..i] is B[j-1..j] swapped )   // swap neighbours</pre>
+    <p>Filling cells left-to-right, top-to-bottom means each answer reuses three earlier ones (this trick is called <i>dynamic programming</i>). The <b>bottom-right</b> cell covers <i>all</i> letters of both words, so it is the answer — the other cells are stepping stones. The <b>blue path</b> traces back which moves produced that answer, so you can read the actual edits off it (listed above the table). <b>Hover any cell</b> to see what it means.</p>
+    <p><b>Where it goes next.</b> Short words would match everything with typos allowed, so: words of 4–6 letters may be 1 edit off, 7+ letters 2, shorter words must be exact. A typo match counts for less than an exact one — in step 4 you'll see it as <span class="chip amber">typo ×0.6</span>.</p>
+  </div>
 </div>
 
 <div class="card">
@@ -391,39 +421,117 @@ function highlight(text, terms) {
 // ---- step 1: tokenizer
 function renderTok() {
   const toks = tokenize($('tokIn').value);
-  $('tokOut').innerHTML = toks.map((x) => `<span class="chip ${x.bonus ? 'bonus' : ''}" title="${esc(x.raw)}">${esc(x.t)}${x.raw !== x.t && !x.bonus ? `<span class="muted"> ← ${esc(x.raw)}</span>` : ''}</span>`).join('') || '<span class="muted small">no terms</span>';
-  $('tokNote').textContent = `normalized: “${normalize($('tokIn').value)}”`;
+  $('tokOut').innerHTML = toks.map((x) => {
+    let why;
+    if (x.bonus) why = 'bonus pair of neighbouring Chinese characters';
+    else if (CJK.test(x.t)) why = 'one Chinese character = one term';
+    else if (x.raw === x.t) why = /\d/.test(x.t) ? 'number — kept as is' : 'kept as is (no ending to remove)';
+    else if (x.raw.startsWith(x.t)) why = `ending “-${x.raw.slice(x.t.length)}” removed, so other forms of the word match`;
+    else why = 'ending changed to the base form';
+    return `<tr><td class="mono">${esc(x.raw)}</td><td><span class="chip ${x.bonus ? 'bonus' : ''}">${esc(x.t)}</span></td><td class="small">${why}</td></tr>`;
+  }).join('') || '<tr><td colspan="3" class="muted small">no terms</td></tr>';
+  const raw = $('tokIn').value;
+  // what this particular text shows, in plain words
+  const notes = [];
+  const lower = raw.toLowerCase();
+  if (lower !== raw) notes.push(`<b>Lower-case:</b> capitals become small letters, so <code>${esc(raw.match(/\p{Lu}\p{L}*/u)[0])}</code> and <code>${esc(raw.match(/\p{Lu}\p{L}*/u)[0].toLowerCase())}</code> are the same word.`);
+  const acc = [...new Set(raw.match(/[À-ÿ]/g) ?? [])].filter((c) => normalize(c) !== c.toLowerCase());
+  if (acc.length) notes.push(`<b>Accents removed:</b> letters with marks lose the mark — ${acc.map((c) => `<code>${esc(c)}</code> → <code>${esc(normalize(c))}</code>`).join(', ')} — so typing <code>${esc(normalize(raw.match(/\S*[À-ÿ]\S*/)[0]))}</code> on a keyboard without accents still finds <code>${esc(raw.match(/\S*[À-ÿ]\S*/)[0])}</code>.`);
+  const cut = toks.filter((x) => !x.bonus && !CJK.test(x.t) && x.raw !== x.t);
+  if (cut.length) notes.push(`<b>Endings removed:</b> ${cut.map((x) => `<code>${esc(x.raw)}</code> → <code>${esc(x.t)}</code>`).join(', ')} — so a search for <code>${esc(cut[0].t)}</code> finds this task whichever ending you type (the search words are trimmed the same way).`);
+  const cjk = toks.filter((x) => CJK.test(x.t) && !x.bonus).length, pairs = toks.filter((x) => x.bonus).length;
+  if (cjk) notes.push(`<b>Chinese:</b> there are no spaces to split on, so each of the ${cjk} characters becomes its own term, plus ${pairs} <span class="chip bonus">pairs</span> of neighbours. ${pairs ? (() => { const pr = toks.filter((x) => x.bonus).pop().t; return `A search for <code>${esc(pr)}</code> then matches both characters <i>and</i> the pair — scoring higher than a task with ${esc(pr[0])} and ${esc(pr[1])} in different places.`; })() : ''}`);
+  if (!notes.length) notes.push('Nothing to change here — every word is already lower-case, unaccented and has no ending to remove.');
+  const terms = toks.filter((x) => !x.bonus).map((x) => x.t).join(' ');
+  $('tokSum').innerHTML = `<div style="margin-bottom:6px">The whole title is stored as: <b class="mono">${esc(terms)}</b>${pairs ? ` <span class="muted">(+ ${pairs} bonus pair${pairs > 1 ? 's' : ''})</span>` : ''}</div><ul style="margin:0;padding-left:18px">${notes.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+  $('tokNote').innerHTML = '';
 }
+document.querySelectorAll('.tokEx').forEach((b) => (b.onclick = () => { $('tokIn').value = b.textContent; renderTok(); }));
 $('tokIn').oninput = renderTok;
 
 // ---- step 2: index
 let IDX = buildIndex(DOCS), selTerm = null;
+const FIELD_NAME = { 3: 'title', 1.5: 'project/repeat', 1: 'notes' };
 function renderIndex() {
   IDX = buildIndex(DOCS);
-  const N = DOCS.length;
   const docsOn = selTerm ? new Set(IDX.postings.get(selTerm)?.keys() ?? []) : new Set();
-  $('docList').innerHTML = DOCS.map((d, i) => `<div class="doc ${docsOn.has(i) ? 'on' : ''}"><b>${i + 1}.</b> ${esc(d.title)}${d.notes ? ` <span class="muted small">— ${esc(d.notes)}</span>` : ''}${d.ctx ? ` <span class="muted small">[${esc(d.ctx)}]</span>` : ''}</div>`).join('');
+  $('docList').innerHTML = DOCS.map((d, i) => `<div class="doc ${docsOn.has(i) ? 'on' : ''}"><b>#${i + 1}</b> ${esc(d.title)}${d.notes ? ` <span class="muted small">— notes: ${esc(d.notes)}</span>` : ''}${d.ctx ? ` <span class="muted small">[${esc(d.ctx)}]</span>` : ''}</div>`).join('');
   const terms = [...IDX.postings.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  $('idxBody').innerHTML = terms.map(([t, p]) => `<tr class="term ${t === selTerm ? 'on' : ''}" data-t="${esc(t)}"><td class="mono">${esc(t)}</td><td>${[...p].map(([i, w]) => `${i + 1}<span class="muted">(${w})</span>`).join(', ')}</td><td class="num">${Math.log(1 + N / p.size).toFixed(2)}</td></tr>`).join('');
-  document.querySelectorAll('.term').forEach((r) => (r.onclick = () => { selTerm = r.dataset.t === selTerm ? null : r.dataset.t; renderIndex(); }));
-  renderSearch(); renderFp();
+  const where = (p) => [...p].map(([i, w]) => `#${i + 1} <span class="muted">${FIELD_NAME[w]}</span>`).join(', ');
+  $('idxBody').innerHTML = terms.map(([t, p]) => `<tr class="term ${t === selTerm ? 'on' : ''}" data-t="${esc(t)}"><td class="mono">${esc(t)}</td><td>${where(p)}</td></tr>`).join('');
+  document.querySelectorAll('.term').forEach((r) => (r.onclick = () => { selTerm = r.dataset.t === selTerm ? null : r.dataset.t; $('lookIn').value = selTerm ?? ''; renderLook(false); renderIndex(); }));
+  const on = document.querySelector('.term.on'), box = document.querySelector('.term-list');
+  if (on && box) box.scrollTop = on.offsetTop - box.clientHeight / 2;
+  renderSearch(); renderFp(); renderDp();
 }
+function renderLook(pick = true) {
+  const v = $('lookIn').value.trim();
+  const t = tokenize(v)[0];
+  if (!t) { $('lookOut').innerHTML = ''; if (pick) { selTerm = null; renderIndex(); } return; }
+  const p = IDX.postings.get(t.t);
+  const step = t.raw !== t.t ? `“${esc(v)}” → term <span class="chip">${esc(t.t)}</span> (same steps as step 1) → ` : `term <span class="chip">${esc(t.t)}</span> → `;
+  $('lookOut').innerHTML = step + (p ? `found in <b>${p.size}</b> task${p.size > 1 ? 's' : ''}: ${[...p].map(([i, w]) => `#${i + 1} (${FIELD_NAME[w]})`).join(', ')}` : '<span class="muted">not in the index — no task contains it (step 3 handles typos)</span>');
+  if (pick) { selTerm = p ? t.t : null; renderIndex(); }
+}
+$('lookIn').oninput = () => renderLook();
 $('addBtn').onclick = () => { const v = $('addIn').value.trim(); if (!v) return; DOCS.push({ id: Date.now(), title: v, notes: '', ctx: '', date: TODAY, done: false }); $('addIn').value = ''; renderIndex(); };
 $('addIn').onkeydown = (e) => e.key === 'Enter' && $('addBtn').click();
 
 // ---- step 3: edit distance table
+let DP = null;
 function renderDp() {
   const a = normalize($('edA').value), b = normalize($('edB').value);
   const D = [Array.from({ length: b.length + 1 }, (_, j) => j)];
   for (let i = 1; i <= a.length; i++) { D[i] = [i]; for (let j = 1; j <= b.length; j++) { let v = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1, D[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, D[i - 2][j - 2] + 1); D[i][j] = v; } }
-  // trace one cheapest path back
-  const path = new Set(); let i = a.length, j = b.length; path.add(`${i},${j}`);
-  while (i > 0 || j > 0) { const c = []; if (i > 0 && j > 0) c.push([i - 1, j - 1]); if (i > 0) c.push([i - 1, j]); if (j > 0) c.push([i, j - 1]); const [ni, nj] = c.sort((x, y) => D[x[0]][x[1]] - D[y[0]][y[1]])[0]; i = ni; j = nj; path.add(`${i},${j}`); }
-  let h = '<tr><th></th><th>·</th>' + [...b].map((c) => `<th>${esc(c)}</th>`).join('') + '</tr>';
-  for (let r = 0; r <= a.length; r++) h += `<tr><th>${r ? esc(a[r - 1]) : '·'}</th>` + D[r].map((v, c) => `<td class="${r === a.length && c === b.length ? 'final' : path.has(`${r},${c}`) ? 'path' : ''}">${v}</td>`).join('') + '</tr>';
+  // trace back the moves that produced the answer (prefer diagonal)
+  const path = new Set(), ops = []; let i = a.length, j = b.length; path.add(`${i},${j}`);
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1] && D[i][j] === D[i - 1][j - 1]) { ops.push(['keep', a[i - 1]]); i--; j--; }
+    else if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1] && D[i][j] === D[i - 2][j - 2] + 1) { ops.push(['swap', a[i - 2] + a[i - 1], b[j - 2] + b[j - 1]]); i -= 2; j -= 2; }
+    else if (i > 0 && j > 0 && D[i][j] === D[i - 1][j - 1] + 1) { ops.push(['replace', a[i - 1], b[j - 1]]); i--; j--; }
+    else if (i > 0 && D[i][j] === D[i - 1][j] + 1) { ops.push(['delete', a[i - 1]]); i--; }
+    else { ops.push(['insert', b[j - 1]]); j--; }
+    path.add(`${i},${j}`);
+  }
+  ops.reverse();
+  DP = { a, b, D };
+  let h = '<tr><th></th><th>“”</th>' + [...b].map((c) => `<th>${esc(c)}</th>`).join('') + '</tr>';
+  for (let r = 0; r <= a.length; r++) h += `<tr><th>${r ? esc(a[r - 1]) : '“”'}</th>` + D[r].map((v, c) => `<td data-r="${r}" data-c="${c}" class="${r === a.length && c === b.length ? 'final' : path.has(`${r},${c}`) ? 'path' : ''}">${v}</td>`).join('') + '</tr>';
   $('dp').innerHTML = h;
   const d = D[a.length][b.length], len = a.length, allowed = len >= 7 ? 2 : len >= 4 ? 1 : 0;
-  $('edOut').innerHTML = `${d} <span class="small muted">edit${d === 1 ? '' : 's'} · ${d <= allowed ? '<span class="tag yes">counts as a typo match</span>' : `<span class="tag no">too far (allowed ${allowed})</span>`}</span>`;
+  $('edOut').innerHTML = `${d} <span class="small muted">edit${d === 1 ? '' : 's'} · ${d === 0 ? '<span class="tag yes">exact match</span>' : d <= allowed ? '<span class="tag yes">counts as a typo match</span>' : `<span class="tag no">too far (a ${len}-letter word may be ${allowed} off)</span>`}</span>`;
+  const edits = ops.filter((o) => o[0] !== 'keep');
+  const say = { insert: (o) => `insert <b>${esc(o[1])}</b>`, delete: (o) => `delete <b>${esc(o[1])}</b>`, replace: (o) => `replace <b>${esc(o[1])}</b> with <b>${esc(o[2])}</b>`, swap: (o) => `swap <b>${esc(o[1])}</b> → <b>${esc(o[2])}</b>` };
+  $('edSteps').innerHTML = edits.length ? `The blue path, read as edits: ${edits.map((o) => say[o[0]](o)).join(', then ')}. Every other letter is kept for free.` : 'Same word — the path runs straight down the diagonal, all letters kept for free.';
+  document.querySelectorAll('#dp td').forEach((td) => (td.onmouseenter = () => explainCell(+td.dataset.r, +td.dataset.c)));
+  explainCell(a.length, b.length);
+  // connect to step 2: is the first word in the index, and what's near it?
+  const t = stem(a), N = [];
+  if (t.length >= 4) for (const v of IDX.vocab) { if (/[\u3400-\u9fff]/.test(v)) continue; const e = editDistance(t, v, 2); if (e <= (t.length >= 7 ? 2 : 1)) N.push([v, e]); }
+  N.sort((x, y) => x[1] - y[1]);
+  $('edNear').innerHTML = `Live, on the sample tasks: the term <span class="chip">${esc(t)}</span> is ${IDX.postings.has(t) ? '<b>in</b>' : '<b>not in</b>'} the index. Terms within the allowed distance: ${N.length ? N.map(([v, e]) => `<span class="chip ${e ? 'amber' : 'ok'}">${esc(v)} · ${e}</span>`).join(' ') : '<span class="muted">none</span>'}`;
+}
+function explainCell(r, c) {
+  const { a, b, D } = DP, A = a.slice(0, r), B = b.slice(0, c), v = D[r][c];
+  let how;
+  if (!r && !c) how = 'Nothing to nothing: 0.';
+  else if (!r) how = `From nothing, insert ${c} letter${c > 1 ? 's' : ''}.`;
+  else if (!c) how = `Delete all ${r} letter${r > 1 ? 's' : ''}.`;
+  else {
+    const same = a[r - 1] === b[c - 1];
+    const cell = (rr, cc) => `“${esc(a.slice(0, rr) || '—')}” → “${esc(b.slice(0, cc) || '—')}”`;
+    const opts = [
+      [`Move diagonally from ${cell(r - 1, c - 1)} (${D[r - 1][c - 1]} edit${D[r - 1][c - 1] === 1 ? '' : 's'}), adding “${a[r - 1]}” to the first word and “${b[c - 1]}” to the second: ${same ? 'same letter, +0' : `different letters, replace “${a[r - 1]}” with “${b[c - 1]}”, +1`}`, D[r - 1][c - 1] + (same ? 0 : 1), [r - 1, c - 1]],
+      [`Move down from ${cell(r - 1, c)} (${D[r - 1][c]}), adding “${a[r - 1]}” to the first word only: delete it, +1`, D[r - 1][c] + 1, [r - 1, c]],
+      [`Move right from ${cell(r, c - 1)} (${D[r][c - 1]}), adding “${b[c - 1]}” to the second word only: insert it, +1`, D[r][c - 1] + 1, [r, c - 1]],
+    ];
+    if (r > 1 && c > 1 && a[r - 1] === b[c - 2] && a[r - 2] === b[c - 1]) opts.push([`Swap from ${cell(r - 2, c - 2)} (${D[r - 2][c - 2]}): “${a[r - 2]}${a[r - 1]}” is “${b[c - 2]}${b[c - 1]}” swapped, +1`, D[r - 2][c - 2] + 1, [r - 2, c - 2]]);
+    const best = opts.find(([, x]) => x === v);
+    document.querySelectorAll('#dp td.src').forEach((x) => x.classList.remove('src'));
+    document.querySelector(`#dp td[data-r="${best[2][0]}"][data-c="${best[2][1]}"]`)?.classList.add('src');
+    how = `Three ways to reach this cell — the <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange-outlined</span> cell in the table is where the cheapest way starts:<ol style="margin:4px 0;padding-left:18px">` + opts.map(([t, x]) => `<li style="margin-bottom:4px">${x === v ? `<b>${t} = ${x}</b> ✓` : `<span class="muted">${t} = ${x}</span>`}</li>`).join('') + '</ol>';
+  }
+  $('edCell').innerHTML = `<b>Cell: “${esc(A || '—')}” → “${esc(B || '—')}” = ${v}</b><br>${v} edit${v === 1 ? ' turns' : 's turn'} “${esc(A)}” into “${esc(B)}”.<br><br>${how}${r === a.length && c === b.length ? '<br><br>This is the bottom-right cell: whole word vs whole word — the answer.' : ''}`;
 }
 $('edA').oninput = $('edB').oninput = renderDp;
 
@@ -439,7 +547,7 @@ function renderSearch() {
   $('qNote').innerHTML = /teeth/i.test(text) && !rows.length ? 'No letters in common with “dentist” — text search can’t help. That’s what part 2 is for.' : 'Coverage first (how many query words matched), then score. Short queries must match every word.';
 }
 $('qIn').oninput = renderSearch;
-document.querySelectorAll('.ex').forEach((b) => (b.onclick = () => { $('qIn').value = b.dataset.q; renderSearch(); }));
+document.querySelectorAll('.ex[data-q]').forEach((b) => (b.onclick = () => { $('qIn').value = b.dataset.q; renderSearch(); }));
 
 // ===================================================================== part 2
 // ---- step 1: 2D vectors
@@ -619,7 +727,7 @@ async function checkOllama() {
 }
 const parts = ['p1', 'p2', 'p3'];
 addEventListener('scroll', () => { let on = 'p1'; for (const p of parts) if ($(p).getBoundingClientRect().top < 140) on = p; document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.part === on)); });
-renderTok(); renderIndex(); renderDp(); drawVec(); renderRrf(); renderIsQ(); renderCtx(); runDil();
+renderTok(); renderIndex(); renderLook(); renderDp(); drawVec(); renderRrf(); renderIsQ(); renderCtx(); runDil();
 checkOllama().then(runSem);
 </script>
 </body>
