@@ -76,6 +76,22 @@ function Shell() {
     }
   }, [today]);
 
+  // files dropped anywhere but a drop zone are ignored (instead of the window opening them)
+  useEffect(() => {
+    const block = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('Files')) return;
+      if (e.target instanceof Element && e.target.closest('.drop-zone')) return;
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+    };
+    window.addEventListener('dragover', block);
+    window.addEventListener('drop', block);
+    return () => {
+      window.removeEventListener('dragover', block);
+      window.removeEventListener('drop', block);
+    };
+  }, []);
+
   useSyncLoop();
   useReminders();
   const llmKey = useStore((s) => `${s.settings.llmEnabled}|${s.settings.llmUrl}|${s.settings.llmModel}`);

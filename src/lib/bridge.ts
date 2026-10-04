@@ -14,6 +14,8 @@ export interface DeskAPI {
   setShortcut(accelerator: string): Promise<boolean>;
   openBackups(): void;
   writeBackup(name: string, json: string): Promise<string>;
+  listBackups(): Promise<{ name: string; size: number; mtime: number }[]>;
+  readBackup(name: string): Promise<string>;
   onMenu(cb: (cmd: string) => void): void;
   openCapture(): void;
   llm(method: 'GET' | 'POST', url: string, body?: string): Promise<{ status: number; text: string }>;

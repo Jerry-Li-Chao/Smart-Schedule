@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Download, Eraser, FolderOpen, History, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Download, Eraser, FileDown, FolderOpen, History, Upload } from 'lucide-react';
 import type { Importance } from '../types';
 import { ask, listModels } from '../lib/llm';
 import { S, useStore } from '../store';
@@ -145,15 +145,44 @@ function Transfer() {
     download(exportFileName(), JSON.stringify(buildExport({ includeSheet: connected && withSheet }), null, 1));
     S().toast('Planner exported');
   };
-  const pick = async (f: File) => {
+  const [over, setOver] = useState(false);
+  const [copies, setCopies] = useState(0); // bump to re-read the saved copies
+  const open = (text: string) => {
     try {
-      setFile(parsePlannerFile(await f.text()));
+      setFile(parsePlannerFile(text));
     } catch (e) {
       S().toast(`Couldn’t read that file: ${e instanceof Error ? e.message : e}`);
     }
   };
+  const pick = async (f: File) => {
+    if (!/\.json$/i.test(f.name)) return S().toast('That’s not a planner file — those end in .json');
+    open(await f.text());
+  };
   return (
     <>
+      <div
+        className={cls('drop-zone', over && 'over')}
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          setOver(true);
+        }}
+        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          const f = e.dataTransfer.files[0];
+          if (f) void pick(f);
+        }}
+      >
+        <FileDown size={18} />
+        <span>
+          <b>Drop a planner file here to import it</b>
+          <span className="muted small"> — a .json you exported, or a copy from the backups folder</span>
+        </span>
+      </div>
+      {desk && <SavedCopies key={copies} onPick={(text) => open(text)} />}
       <div className="inline gap">
         <button className="btn primary" onClick={exportNow}>
           <Download size={14} /> Export planner
@@ -177,9 +206,48 @@ function Transfer() {
         <b>Export</b> saves the whole planner as one file. <b>Import</b> opens a planner file and asks whether to replace this planner or add to it.{' '}
         <b>Clear</b> empties this planner (a copy is saved first) — export, clear, then import to get everything back exactly as it was.
       </p>
-      {file && <ImportPlanner file={file} onClose={() => setFile(null)} />}
-      {clearing && <ClearPlanner onClose={() => setClearing(false)} />}
+      {file && <ImportPlanner file={file} onClose={() => (setFile(null), setCopies((n) => n + 1))} />}
+      {clearing && <ClearPlanner onClose={() => (setClearing(false), setCopies((n) => n + 1))} />}
     </>
+  );
+}
+
+const COPY_KIND: [RegExp, string][] = [
+  [/^before-clear-/, 'Saved before clearing'],
+  [/^before-import-|^before-switch-/, 'Saved before an import'],
+  [/^\d{4}-\d{2}-\d{2}\.json$/, 'Daily copy'],
+];
+
+/** Copies in the desktop backups folder, newest first — import one without digging through Finder. */
+function SavedCopies({ onPick }: { onPick: (text: string) => void }) {
+  const [list, setList] = useState<{ name: string; size: number; mtime: number }[] | null>(null);
+  const [all, setAll] = useState(false);
+  useEffect(() => {
+    void desk!.listBackups().then(setList);
+  }, []);
+  if (!list?.length) return null;
+  const shown = all ? list : list.slice(0, 5);
+  return (
+    <div className="saved-copies">
+      <div className="sub-label">Saved copies on this computer</div>
+      {shown.map((c) => (
+        <div key={c.name} className="sc-row">
+          <span className="sc-kind">{COPY_KIND.find(([re]) => re.test(c.name))?.[1] ?? 'Exported file'}</span>
+          <span className="muted small">
+            {new Date(c.mtime).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {Math.max(1, Math.round(c.size / 1024))} KB
+          </span>
+          <span className="spacer" />
+          <button className="btn tiny" onClick={async () => onPick(await desk!.readBackup(c.name))}>
+            <Upload size={12} /> Import…
+          </button>
+        </div>
+      ))}
+      {list.length > 5 && (
+        <button className="link-btn small" onClick={() => setAll((x) => !x)}>
+          {all ? 'Show fewer' : `Show all ${list.length}`}
+        </button>
+      )}
+    </div>
   );
 }
 

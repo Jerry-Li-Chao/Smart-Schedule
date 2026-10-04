@@ -60,6 +60,10 @@ function createMain() {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
+  // a file dropped outside the drop zone must not replace the app with that file
+  win.webContents.on('will-navigate', (e, url) => {
+    if (url.startsWith('file:')) e.preventDefault(); // the app itself never navigates by URL
+  });
   win.on('close', (e) => {
     writePrefs({ bounds: win.getBounds() });
     // macOS convention: closing hides; the app (and the capture shortcut) keeps running
@@ -140,7 +144,8 @@ async function backupIfNeeded(json) {
   await fs.promises.mkdir(dir, { recursive: true });
   if (fs.existsSync(file)) return;
   await fs.promises.writeFile(file, json);
-  const all = (await fs.promises.readdir(dir)).filter((f) => f.endsWith('.json')).sort();
+  // only the dated daily copies rotate; safety copies (before-import/-clear) are kept
+  const all = (await fs.promises.readdir(dir)).filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
   for (const old of all.slice(0, Math.max(0, all.length - 60))) await fs.promises.unlink(path.join(dir, old));
 }
 
@@ -205,6 +210,27 @@ ipcMain.handle('backups:write', async (_e, name, json) => {
   const file = path.join(backupDir(), name);
   await fs.promises.writeFile(file, json);
   return file;
+});
+
+const BACKUP_NAME = /^[\w.-]+\.json$/;
+ipcMain.handle('backups:list', async () => {
+  try {
+    const dir = backupDir();
+    const names = (await fs.promises.readdir(dir)).filter((f) => BACKUP_NAME.test(f));
+    const out = await Promise.all(
+      names.map(async (name) => {
+        const st = await fs.promises.stat(path.join(dir, name));
+        return { name, size: st.size, mtime: st.mtimeMs };
+      }),
+    );
+    return out.sort((a, b) => b.mtime - a.mtime);
+  } catch {
+    return [];
+  }
+});
+ipcMain.handle('backups:read', async (_e, name) => {
+  if (typeof name !== 'string' || !BACKUP_NAME.test(name)) throw new Error('bad backup name');
+  return fs.promises.readFile(path.join(backupDir(), name), 'utf8');
 });
 
 ipcMain.on('backups:open', () => {
