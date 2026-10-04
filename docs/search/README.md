@@ -1,6 +1,19 @@
 # How ⌘K search works
 
-**Start here: [the interactive tutorial](tutorial.html)** — open it in a browser; with Ollama running it uses your real models.
+**Start here: [the interactive tutorial](tutorial.html).**
+
+How to open it: the simplest way is to double-click `tutorial.html`. If Ollama refuses connections
+from a local file (it may), the page shows measured numbers instead of live ones. For live results
+with your models, run the dev server from the **project root** — the folder that contains
+`package.json`, two levels up from this one (not `docs/search/`):
+
+```bash
+cd path/to/Smart-Schedule   # the repo root, where package.json is
+npm run dev
+```
+
+then open <http://localhost:5173/docs/search/tutorial.html>. A dot in the top bar shows whether
+it's connected to Ollama.
 
 The same material as text:
 
