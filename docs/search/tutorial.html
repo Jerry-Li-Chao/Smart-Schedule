@@ -196,9 +196,9 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
 <div class="card">
   <div class="try">Step 1 · Drag the arrows</div>
   <h3>Similarity = the angle between arrows</h3>
-  <p class="small muted">Real vectors have 1,024 dimensions; here are 2 so you can see them. Cosine similarity is the cosine of the angle: 1 = same direction, 0 = unrelated. Drag the tips.</p>
+  <p class="small muted">Real vectors have 1,024 dimensions; here are 2 so you can see them. Cosine similarity is the cosine of the angle: 1 = same direction, 0 = unrelated. Drag the dots at the arrow tips; the shaded wedge is the angle between the query and the arrow you last touched.</p>
   <div class="grid2">
-    <canvas id="vec" width="420" height="420"></canvas>
+    <canvas id="vec" style="width:100%;max-width:440px;aspect-ratio:1;align-self:start;border-radius:12px;background:var(--bg);touch-action:none;cursor:grab"></canvas>
     <div>
       <table><tbody id="cosTable"></tbody></table>
       <div class="note">If every arrow is stored at length 1 (“normalized”), cosine similarity is just the dot product: <span class="mono">a₁b₁ + a₂b₂ (+ … 1,024 terms)</span>. Comparing a query with 3,000 tasks is 3 million multiply-adds — a few milliseconds. No vector database needed.</div>
@@ -584,31 +584,68 @@ document.querySelectorAll('.ex[data-q]').forEach((b) => (b.onclick = () => { $('
 // ===================================================================== part 2
 // ---- step 1: 2D vectors
 const cv = $('vec'), cx = cv.getContext('2d');
+const L = 440; // drawing units; the canvas is scaled for sharp lines on any screen
 const arrows = [
   { name: 'teeth (query)', a: 0.55, color: '#7c3aed' },
   { name: 'Call the dentist', a: 0.8, color: '#2f6fed' },
   { name: '看牙医', a: 0.95, color: '#2f9e44' },
   { name: 'Buy groceries', a: 2.4, color: '#e5484d' },
 ];
-let dragging = null;
+let dragging = null, focus = arrows[1];
+const angBetween = (u, v) => Math.abs(((v.a - u.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
 function drawVec() {
-  const W = cv.width, c = W / 2, R = W * 0.4, dark = matchMedia('(prefers-color-scheme: dark)').matches;
-  cx.clearRect(0, 0, W, W);
-  cx.strokeStyle = dark ? '#3a3a40' : '#e4e1d9'; cx.beginPath(); cx.arc(c, c, R, 0, Math.PI * 2); cx.stroke();
-  cx.beginPath(); cx.moveTo(c - R - 10, c); cx.lineTo(c + R + 10, c); cx.moveTo(c, c - R - 10); cx.lineTo(c, c + R + 10); cx.stroke();
-  for (const v of arrows) {
-    const x = c + Math.cos(v.a) * R, y = c - Math.sin(v.a) * R;
-    cx.strokeStyle = cx.fillStyle = v.color; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(c, c); cx.lineTo(x, y); cx.stroke();
-    cx.beginPath(); cx.arc(x, y, 9, 0, Math.PI * 2); cx.fill();
-    cx.font = '600 14px -apple-system, sans-serif'; cx.fillText(v.name, x + (Math.cos(v.a) > 0 ? 12 : -12 - cx.measureText(v.name).width), y - 10);
-  }
+  const dpr = window.devicePixelRatio || 1, css = cv.clientWidth || L;
+  if (cv.width !== Math.round(css * dpr)) { cv.width = cv.height = Math.round(css * dpr); }
+  cx.setTransform(cv.width / L, 0, 0, cv.width / L, 0, 0);
+  const c = L / 2, R = L * 0.33, dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const ink = dark ? '#e8e6e1' : '#2b2a27', faint = dark ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)', mid = dark ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.35)';
+  cx.clearRect(0, 0, L, L);
+  // grid: unit circle, axes, labels
+  cx.lineWidth = 1; cx.strokeStyle = faint;
+  for (const k of [0.5, 1]) { cx.beginPath(); cx.arc(c, c, R * k, 0, Math.PI * 2); cx.stroke(); }
+  cx.beginPath(); cx.moveTo(c - R - 24, c); cx.lineTo(c + R + 24, c); cx.moveTo(c, c - R - 24); cx.lineTo(c, c + R + 24); cx.stroke();
+  cx.fillStyle = mid; cx.font = '11px -apple-system, sans-serif';
+  cx.textAlign = 'right'; cx.fillText('dimension 1 →', c + R + 24, c + 16);
+  cx.save(); cx.translate(c - 8, c - R - 24); cx.rotate(-Math.PI / 2); cx.textAlign = 'right'; cx.fillText('dimension 2 →', 0, 0); cx.restore();
+  // the angle wedge: query → focused arrow
   const q = arrows[0];
-  $('cosTable').innerHTML = '<tr><th>vs query</th><th class="num">angle</th><th class="num">cosine</th></tr>' + arrows.slice(1).map((v) => { const ang = Math.abs(((v.a - q.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); const cos = Math.cos(ang); return `<tr><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td></tr>`; }).join('');
+  if (focus && focus !== q) {
+    const ang = angBetween(q, focus), ccw = ((focus.a - q.a + Math.PI * 4) % (Math.PI * 2)) > Math.PI;
+    cx.fillStyle = focus.color + '22'; cx.strokeStyle = focus.color + '99'; cx.lineWidth = 1.5;
+    cx.beginPath(); cx.moveTo(c, c); cx.arc(c, c, R * 0.42, -q.a, -focus.a, !ccw); cx.closePath(); cx.fill(); cx.stroke();
+    const mida = q.a + (ccw ? -ang : ang) / 2;
+    cx.fillStyle = focus.color; cx.font = '600 13px -apple-system, sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(`${Math.round((ang * 180) / Math.PI)}°`, c + Math.cos(mida) * R * 0.58, c - Math.sin(mida) * R * 0.58);
+  }
+  // arrows, query last so it sits on top
+  const placed = [];
+  for (const v of [...arrows.slice(1), q]) {
+    const x = c + Math.cos(v.a) * R, y = c - Math.sin(v.a) * R;
+    cx.strokeStyle = cx.fillStyle = v.color; cx.lineWidth = v === q ? 4 : 3; cx.lineCap = 'round';
+    cx.beginPath(); cx.moveTo(c, c); cx.lineTo(x, y); cx.stroke();
+    cx.beginPath(); cx.arc(x, y, v === dragging ? 11 : 9, 0, Math.PI * 2); cx.fill();
+    cx.lineWidth = 2.5; cx.strokeStyle = dark ? '#1c1c1f' : '#fff'; cx.stroke();
+    // label: a pill just outside the tip, kept inside the canvas
+    cx.font = `${v === q ? 700 : 600} 13px -apple-system, sans-serif`; cx.textBaseline = 'middle';
+    const tw = cx.measureText(v.name).width, pw = tw + 16, ph = 24;
+    let lx = c + Math.cos(v.a) * (R + 26) - pw / 2 + Math.cos(v.a) * (pw / 2 - 8), ly = c - Math.sin(v.a) * (R + 26) - ph / 2;
+    lx = Math.max(6, Math.min(L - pw - 6, lx)); ly = Math.max(6, Math.min(L - ph - 6, ly));
+    const up = Math.sin(v.a) >= 0 ? -1 : 1; // nudge away from labels already placed
+    for (let k = 0; k < 6 && placed.some((p) => lx < p[0] + p[2] && lx + pw > p[0] && ly < p[1] + p[3] + 3 && ly + ph + 3 > p[1]); k++) ly = Math.max(6, Math.min(L - ph - 6, ly + up * (ph + 4)));
+    placed.push([lx, ly, pw, ph]);
+    cx.fillStyle = dark ? 'rgba(28,28,31,.92)' : 'rgba(255,255,255,.95)'; cx.strokeStyle = v.color + '66'; cx.lineWidth = 1;
+    cx.beginPath(); cx.roundRect(lx, ly, pw, ph, 12); cx.fill(); cx.stroke();
+    cx.fillStyle = v.color; cx.textAlign = 'left'; cx.fillText(v.name, lx + 8, ly + ph / 2 + 0.5);
+  }
+  cx.fillStyle = ink; cx.beginPath(); cx.arc(c, c, 3.5, 0, Math.PI * 2); cx.fill();
+  $('cosTable').innerHTML = '<tr><th>vs query “teeth”</th><th class="num">angle</th><th class="num">cosine</th></tr>' + arrows.slice(1).map((v) => { const ang = angBetween(q, v); const cos = Math.cos(ang); return `<tr style="${v === focus ? 'background:var(--accent-soft)' : ''}"><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td></tr>`; }).join('');
 }
-function pt(e) { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height]; }
-cv.onpointerdown = (e) => { const [x, y] = pt(e), c = cv.width / 2, R = cv.width * 0.4; dragging = arrows.find((v) => Math.hypot(x - (c + Math.cos(v.a) * R), y - (c - Math.sin(v.a) * R)) < 22) ?? null; if (dragging) cv.setPointerCapture(e.pointerId); };
-cv.onpointermove = (e) => { if (!dragging) return; const [x, y] = pt(e), c = cv.width / 2; dragging.a = Math.atan2(c - y, x - c); drawVec(); };
-cv.onpointerup = () => (dragging = null);
+function pt(e) { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * L, ((e.clientY - r.top) / r.height) * L]; }
+const tipHit = (x, y) => { const c = L / 2, R = L * 0.33; return arrows.find((v) => Math.hypot(x - (c + Math.cos(v.a) * R), y - (c - Math.sin(v.a) * R)) < 22) ?? null; };
+cv.onpointerdown = (e) => { const [x, y] = pt(e); dragging = tipHit(x, y); if (dragging) { if (dragging !== arrows[0]) focus = dragging; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; drawVec(); } };
+cv.onpointermove = (e) => { const [x, y] = pt(e), c = L / 2; if (!dragging) { cv.style.cursor = tipHit(x, y) ? 'grab' : 'default'; return; } dragging.a = Math.atan2(c - y, x - c); drawVec(); };
+cv.onpointerup = () => { dragging = null; cv.style.cursor = 'grab'; drawVec(); };
+new ResizeObserver(() => drawVec()).observe(cv);
 
 // ---- step 2: real similarities (live via Ollama, or measured numbers)
 const SEM_TASKS = ['Call the dentist about the cleaning', 'Renew vehicle registration', 'Buy groceries', '看牙医', 'Pay rent', 'Streaming service subscription', 'Book flights to Tokyo', 'Back up laptop', 'Spanish lesson', 'Gym membership'];
