@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Plus, Repeat, RotateCw, Zap } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Plus, RotateCw, Zap } from 'lucide-react';
 import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
 import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
@@ -7,8 +7,8 @@ import { describeRecurrence, occurrenceNumber } from '../lib/recurrence';
 import { activeBills, chargesBetween, monthlyCost, repeatInfos, type Cadence, type RepeatInfo } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
-import { capture, setItemStatus, updateTask } from '../actions';
-import { isSubmitKey, Segmented } from './ui';
+import { setItemStatus, updateTask } from '../actions';
+import { Segmented } from './ui';
 import { RepeatForm } from './RepeatForm';
 
 const GROUPS: { cadence: Cadence; label: string }[] = [
@@ -25,7 +25,6 @@ export function Repeats({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
   useStore((s) => s.settings.currency); // re-render amounts when the currency changes
   const [filter, setFilter] = useState<Filter>('all');
-  const [v, setV] = useState('');
   const [form, setForm] = useState(false);
   const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
   const live = all.filter((r) => !r.ended);
@@ -51,30 +50,14 @@ export function Repeats({ today }: { today: ISODate }) {
   const sorted = (list: RepeatInfo[]) =>
     [...list].sort((a, b) => (a.next ?? '9999').localeCompare(b.next ?? '9999') || RANK[a.task.importance] - RANK[b.task.importance]);
 
-  const add = () => {
-    if (!v.trim()) return;
-    const made = capture(v);
-    setV('');
-    if (made.length && !made[0].recurrence) S().toast('Saved — add “every day / week / month…” to make it repeat.');
-  };
-
   return (
     <div className="repeats">
-      <div className="rp-add">
-        <Repeat size={16} />
-        <input
-          value={v}
-          placeholder="Type one — “Streaming $15.49 every month on the 12th autopay” — or use New repeat →"
-          onChange={(e) => setV(e.target.value)}
-          onKeyDown={(e) => isSubmitKey(e) && add()}
-        />
-        {v.trim() ? (
-          <button className="btn tiny primary" onClick={add}>
-            Add
-          </button>
-        ) : (
-          <button className="btn tiny primary" onClick={() => setForm(true)}>
-            <Plus size={13} /> New repeat
+      <div className="rp-head">
+        <span className="muted small">Bills, habits, renewals — everything that comes back.</span>
+        <span className="spacer" />
+        {!form && (
+          <button className="btn primary" onClick={() => setForm(true)}>
+            <Plus size={14} /> New repeat
           </button>
         )}
       </div>
@@ -108,7 +91,7 @@ export function Repeats({ today }: { today: ISODate }) {
 
       {!all.length && (
         <div className="rp-empty">
-          Nothing repeats yet. Add things like rent, credit card payments, daily habits or renewals above — they all land here, with the next date up front.
+          Nothing repeats yet. Use New repeat to add rent, subscriptions, daily habits or renewals — they all land here, with the next date up front.
         </div>
       )}
 
