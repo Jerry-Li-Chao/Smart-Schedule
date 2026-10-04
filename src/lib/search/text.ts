@@ -167,9 +167,21 @@ export function passes(d: SearchDoc, f: Filters): boolean {
 
 const recency = (d: SearchDoc, today: ISODate) => (d.date ? 1 + 0.2 * Math.exp(-Math.abs(diffDays(today, d.date)) / 45) : 1);
 
+/** Words that carry no meaning on their own in a query ("when did I last pay rent" → "pay rent"). */
+const STOP = new Set(
+  ('a an the i me my mine we our us you your he she it its they them their is are was were be been being am do does did ' +
+    'have has had to of in on at for with about from by and or but not no what whats when where which who whom why how ' +
+    'there here this that these those any anything some something all can could would will shall should may might must ' +
+    'also just ever last next please tell show list remind get got thing things stuff 的 了 吗 呢 我 是 在 有 什么').split(' '),
+);
+export function dropStopWords(text: string): string {
+  const kept = text.split(/\s+/).filter((w) => w && !STOP.has(normalize(w).replace(/[^\p{L}\p{N}']/gu, '')));
+  return kept.length ? kept.join(' ') : text;
+}
+
 export function searchText(idx: TextIndex, text: string, filters: Filters, today: ISODate, limit = 40): TextHit[] {
   const N = idx.docs.length || 1;
-  const qTerms = tokenize(text);
+  const qTerms = tokenize(dropStopWords(text));
   const words = qTerms.filter((x) => !x.bonus);
 
   // nothing typed but filters: everything that fits, newest first

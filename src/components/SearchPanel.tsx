@@ -10,6 +10,8 @@ import { parseQuery } from '../lib/search/query';
 import { buildTextIndex, highlightRanges, normalize, searchText } from '../lib/search/text';
 import { searchVectors, type VecHit } from '../lib/search/vectors';
 import { fuse, type Hit } from '../lib/search/hybrid';
+import { buildContext, isQuestion } from '../lib/search/ask';
+import { askStream, warmUp } from '../lib/search/askLlm';
 
 const KIND: Record<DocKind, { icon: typeof Search; label: string }> = {
   task: { icon: CalendarDays, label: 'Task' },
@@ -63,6 +65,64 @@ export function SearchPanel({ today }: { today: ISODate }) {
     [textHits, vec, parsed],
   );
 
+  // layer 3: answer questions from the retrieved items, streamed from the local LLM
+  const llmOk = useStore((s) => !!(s.settings.llmEnabled && s.settings.llmUrl && s.settings.llmModel));
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (llmOk) warmUp(); // load the model while the user is still typing
+    return () => abort.current?.abort();
+  }, [llmOk]);
+  const ask = (question: string) => {
+    if (!llmOk || !question.trim()) return;
+    // nothing matched the words, but there are filters ("bills coming up"): read what fits the filters
+    const pool = hits.length ? hits.map((h) => h.doc) : searchText(index, '', parsed.filters, today).map((h) => h.doc);
+    const ctx = buildContext(pool, entities, today);
+    const key = `${question.trim()}|${ctx.refs.join(',')}`;
+    if (answer?.key === key) return;
+    const hit = answerCache.get(key);
+    if (hit) return setAnswer(hit);
+    abort.current?.abort();
+    const ctl = (abort.current = new AbortController());
+    const docs = Object.fromEntries(pool.map((d) => [d.id, d]));
+    let text = '';
+    const t0 = performance.now();
+    setAnswer({ key, q: question, text: '', refs: ctx.refs.map((id) => docs[id]), state: 'thinking' });
+    askStream(question, ctx, today, (d) => {
+      text += d;
+      setAnswer((a) => (a?.key === key ? { ...a, text, state: 'streaming' } : a));
+    }, ctl.signal)
+      .then(() => {
+        if (ctl.signal.aborted) return;
+        const done: Answer = { key, q: question, text: text.trim() || 'No answer came back.', refs: ctx.refs.map((id) => docs[id]), state: 'done', ms: performance.now() - t0 };
+        answerCache.set(key, done);
+        setAnswer((a) => (a?.key === key ? done : a));
+      })
+      .catch((e) => {
+        if (ctl.signal.aborted) return;
+        setAnswer((a) => (a?.key === key ? { ...a, state: 'error', text: e instanceof Error ? e.message : String(e) } : a));
+      });
+  };
+  // questions get an answer by themselves: once meaning results are in, or after ~1 s at most —
+  // never held up by a slow embedding call. One automatic answer per question.
+  const question = isQuestion(q);
+  const autoFor = useRef('');
+  useEffect(() => {
+    if (!question || !llmOk || autoFor.current === q.trim()) return;
+    const go = () => {
+      autoFor.current = q.trim();
+      ask(q);
+    };
+    const t = setTimeout(go, thinking ? 1100 : 450);
+    return () => clearTimeout(t);
+  }, [question, llmOk, thinking, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (answer && answer.q.trim() !== q.trim()) {
+      abort.current?.abort();
+      setAnswer(null);
+    }
+  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => setSel(0), [q]);
   useEffect(() => {
     listRef.current?.querySelector('.sr-row.on')?.scrollIntoView({ block: 'nearest' });
@@ -81,6 +141,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
     if (e.key === 'Escape') return close();
     if (e.key === 'ArrowDown') (e.preventDefault(), setSel((i) => Math.min(hits.length - 1, i + 1)));
     else if (e.key === 'ArrowUp') (e.preventDefault(), setSel((i) => Math.max(0, i - 1)));
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) (e.preventDefault(), ask(q));
     else if (e.key === 'Enter' && hits[sel] && !e.nativeEvent.isComposing) open(hits[sel].doc);
   };
 
@@ -99,6 +160,11 @@ export function SearchPanel({ today }: { today: ISODate }) {
             </button>
           )}
           {thinking && <Loader2 size={14} className="spin" aria-label="Searching by meaning" />}
+          {llmOk && q.trim() && (
+            <button className={cls('btn tiny ask-btn', question && 'auto')} title="Ask your local AI about this (⌘↵)" onClick={() => ask(q)}>
+              <Sparkles size={12} /> Ask
+            </button>
+          )}
           <kbd>esc</kbd>
         </div>
         {chips.length > 0 && (
@@ -113,6 +179,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
         )}
 
         <div className="sp-results" ref={listRef}>
+          {answer && <AnswerCard a={answer} onOpen={open} />}
           {!q.trim() && (
             <div className="sp-empty">
               <div className="small muted">Search by words you remember — typos and partial words are fine. Try:</div>
@@ -192,6 +259,54 @@ function Row({ h, on, today, onPick, onHover }: { h: Hit; on: boolean; today: IS
         {d.projectTitle && <span className="sr-proj">{d.projectTitle}</span>}
         <span>{d.kind === 'repeat' ? K.label : d.date ? fmtDay(d.date, today) : K.label}</span>
       </div>
+    </div>
+  );
+}
+
+interface Answer {
+  key: string;
+  q: string;
+  text: string;
+  /** item [n] → document */
+  refs: SearchDoc[];
+  state: 'thinking' | 'streaming' | 'done' | 'error';
+  ms?: number;
+}
+/** Same question over the same items → same answer; no need to ask twice. */
+const answerCache = new Map<string, Answer>();
+
+/** The answer, with [n] citations turned into links to the items. */
+function AnswerCard({ a, onOpen }: { a: Answer; onOpen: (d: SearchDoc) => void }) {
+  const parts = a.text.split(/(\[\d+\])/g);
+  return (
+    <div className={cls('answer', a.state === 'error' && 'err')}>
+      <div className="ans-head">
+        <Sparkles size={13} /> <b>Answer</b>
+        <span className="spacer" />
+        {a.state === 'thinking' && (
+          <span className="muted small">
+            <Loader2 size={12} className="spin" /> reading {a.refs.length} item{a.refs.length === 1 ? '' : 's'}…
+          </span>
+        )}
+        {a.state === 'done' && a.ms !== undefined && <span className="muted small">{(a.ms / 1000).toFixed(1)} s</span>}
+      </div>
+      <div className="ans-text">
+        {a.state === 'error'
+          ? `Couldn’t get an answer: ${a.text}`
+          : parts.map((p, i) => {
+              const m = /^\[(\d+)\]$/.exec(p);
+              const doc = m ? a.refs[Number(m[1]) - 1] : undefined;
+              return doc ? (
+                <button key={i} className="cite" title={doc.title} onClick={() => onOpen(doc)}>
+                  {m![1]}
+                </button>
+              ) : (
+                <span key={i}>{p}</span>
+              );
+            })}
+        {a.state === 'streaming' && <span className="caret" />}
+      </div>
+      {a.state === 'done' && <div className="ans-foot">From your planner, by your local AI — it can be wrong, so check the linked items.</div>}
     </div>
   );
 }

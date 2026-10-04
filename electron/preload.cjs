@@ -18,6 +18,12 @@ contextBridge.exposeInMainWorld('desk', {
   listBackups: () => ipcRenderer.invoke('backups:list'),
   readBackup: (name) => ipcRenderer.invoke('backups:read', name),
   llm: (method, url, body) => ipcRenderer.invoke('llm:request', method, url, body),
+  llmStream: (id, url, body, onChunk) => {
+    const listen = (_e, cid, text) => cid === id && onChunk(text);
+    ipcRenderer.on('llm:chunk', listen);
+    return ipcRenderer.invoke('llm:stream', id, url, body).finally(() => ipcRenderer.removeListener('llm:chunk', listen));
+  },
+  llmAbort: (id) => ipcRenderer.send('llm:abort', id),
   openCapture: () => ipcRenderer.send('capture:toggle'),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd)),
 });

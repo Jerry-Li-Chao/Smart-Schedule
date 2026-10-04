@@ -124,8 +124,9 @@ texts:
 
 So we keep matches ≥ **0.60**, and also drop anything more than 0.12 below the best match — once
 there's a strong match, weak ones are just noise. These numbers are model-specific: a different
-model needs its own measurement (the little script approach in this page's history works well:
-embed 10 tasks and 10 queries you know the answers to, and look at the numbers).
+model needs its own measurement. The way these were found is simple and worth copying: embed ~10
+tasks and ~10 queries whose right answers you know, print every similarity, and look at where the
+related pairs and the unrelated pairs fall.
 
 ## Step 5 — Merge with text search (hybrid search)
 

@@ -25,7 +25,8 @@ const MONTH_RE = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
 
 export function parseQuery(input: string, today: ISODate): ParsedQuery {
   const f: Filters = {};
-  let s = ` ${input.trim()} `;
+  // punctuation never matters for filters: "coming up?" is "coming up"
+  let s = ` ${input.trim().replace(/[?？!！.,，;；]+/g, ' ')} `;
   // fn may return false to leave the words in place (not a filter after all)
   const take = (re: RegExp, fn: (...m: string[]) => boolean | void) => {
     s = s.replace(re, (...m: string[]) => (fn(...m) === false ? m[0] : ' '));
@@ -52,6 +53,7 @@ export function parseQuery(input: string, today: ISODate): ParsedQuery {
       range(from, addDays(addMonths(from, 1), -1), `${which.toLowerCase()} month`);
     }
   });
+  take(/\s(coming up|upcoming|soon|ahead|接下来|即将)(?=\s)/i, () => range(today, addDays(today, 30), 'next 30 days'));
   // "in march", "march 2026", "march"
   take(new RegExp(`\\s(in\\s+)?${MONTH_RE}(?:\\s+(\\d{4}))?(?=\\s)`, 'i'), (_m, inWord, mon, y) => {
     const m = MONTHS.indexOf(mon.toLowerCase());
@@ -72,7 +74,8 @@ export function parseQuery(input: string, today: ISODate): ParsedQuery {
   take(/\s(open|unfinished|todo|to-do|not done|未完成)(?=\s)/i, () => {
     f.status = 'open';
   });
-  take(/\s(must|should|could)s?(?=\s)/i, (_m, l) => {
+  // "must call…" is a filter; "what should I do" is just a question
+  take(/\s(must|should|could)s?(?=\s)(?!\s+(?:i|we|you|he|she|they|it|be|have|get|go|do)\b)/i, (_m, l) => {
     f.importance = l.toLowerCase() as Importance;
   });
   take(/\s(bills?|subscriptions?|账单|订阅)(?=\s)/i, () => {

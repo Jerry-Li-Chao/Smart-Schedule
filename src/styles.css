@@ -1286,3 +1286,15 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .ix-bar { display: inline-block; width: 120px; height: 6px; margin-left: 8px; background: var(--drop-bg); border-radius: 3px; overflow: hidden; vertical-align: middle; }
 .ix-bar i { display: block; height: 100%; background: var(--accent); }
 .sp-input .spin { color: var(--accent); }
+.ask-btn { display: inline-flex; align-items: center; gap: 4px; color: #7c3aed; border-color: color-mix(in srgb, #8b5cf6 40%, transparent); }
+.ask-btn.auto { background: color-mix(in srgb, #8b5cf6 12%, transparent); }
+.answer { margin: 4px 4px 8px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, #8b5cf6 8%, var(--panel)); border: 1px solid color-mix(in srgb, #8b5cf6 30%, transparent); }
+.answer.err { background: var(--must-bg); border-color: color-mix(in srgb, var(--must) 30%, transparent); }
+.ans-head { display: flex; align-items: center; gap: 6px; color: #7c3aed; font-size: 12.5px; margin-bottom: 4px; }
+.ans-head .muted { display: inline-flex; align-items: center; gap: 4px; }
+.ans-text { font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
+.cite { display: inline-flex; align-items: center; justify-content: center; min-width: 17px; height: 17px; padding: 0 4px; margin: 0 1px; border-radius: 5px; border: 0; font-size: 10.5px; font-weight: 700; color: #fff; background: #8b5cf6; cursor: pointer; vertical-align: 1px; }
+.cite:hover { background: #6d28d9; }
+.caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; background: #8b5cf6; vertical-align: -2px; animation: blink 0.9s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.ans-foot { font-size: 11px; color: var(--muted); margin-top: 6px; }

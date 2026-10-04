@@ -181,6 +181,27 @@ ipcMain.handle('llm:request', async (_e, method, url, body) => {
   return { status: r.status, text: await r.text() };
 });
 
+// streamed answers: raw response text is forwarded piece by piece as it arrives
+const streams = new Map();
+ipcMain.handle('llm:stream', async (e, id, url, body) => {
+  if (typeof url !== 'string' || !/^https?:\/\//.test(url)) throw new Error('LLM URL must start with http:// or https://');
+  const ctl = new AbortController();
+  streams.set(id, ctl);
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.any([ctl.signal, AbortSignal.timeout(120000)]) });
+    if (!r.ok || !r.body) return { status: r.status, text: await r.text() };
+    const dec = new TextDecoder();
+    for await (const chunk of r.body) if (!e.sender.isDestroyed()) e.sender.send('llm:chunk', id, dec.decode(chunk, { stream: true }));
+    return { status: r.status, text: '' };
+  } catch (err) {
+    if (ctl.signal.aborted) return { status: 499, text: 'cancelled' };
+    throw err;
+  } finally {
+    streams.delete(id);
+  }
+});
+ipcMain.on('llm:abort', (_e, id) => streams.get(id)?.abort());
+
 // ---------- quick capture ----------
 ipcMain.on('capture:add', (_e, text) => {
   if (win && !win.isDestroyed()) win.webContents.send('capture:added', String(text));

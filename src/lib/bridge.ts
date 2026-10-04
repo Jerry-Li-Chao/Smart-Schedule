@@ -19,6 +19,8 @@ export interface DeskAPI {
   onMenu(cb: (cmd: string) => void): void;
   openCapture(): void;
   llm(method: 'GET' | 'POST', url: string, body?: string): Promise<{ status: number; text: string }>;
+  llmStream(id: string, url: string, body: string, onChunk: (text: string) => void): Promise<{ status: number; text: string }>;
+  llmAbort(id: string): void;
 }
 
 interface GoogleScriptRun {
