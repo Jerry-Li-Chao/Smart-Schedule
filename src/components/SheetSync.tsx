@@ -43,6 +43,7 @@ export function SheetSync() {
       const r = await apiCall<Ping>({ action: 'ping' });
       if (!r.ok) throw new Error(r.error);
       setPing({ spreadsheet: r.spreadsheet, sheets: r.sheets, linked: r.linked ?? null });
+      if (r.spreadsheet && r.spreadsheet !== S().settings.sheetName) S().setSettings({ sheetName: r.spreadsheet });
     } catch (e) {
       setPing(null);
       setErr(e instanceof Error ? e.message : String(e));

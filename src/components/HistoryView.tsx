@@ -48,7 +48,7 @@ export function HistoryView() {
     const ql = q.toLowerCase();
     return history.filter((h) => !ql || h.after.title.toLowerCase().includes(ql) || h.label.toLowerCase().includes(ql)).slice(0, 400);
   }, [history, q]);
-  const trash = useMemo(() => Object.values(entities).filter((e) => e.deleted).sort((a, b) => b.updatedAt - a.updatedAt), [entities]);
+  const trash = useMemo(() => Object.values(entities).filter((e) => e.deleted && !e.purged).sort((a, b) => b.updatedAt - a.updatedAt), [entities]);
 
   const bytes = useMemo(() => new Blob([JSON.stringify(history)]).size, [history]);
   const clear = (days?: number) => {

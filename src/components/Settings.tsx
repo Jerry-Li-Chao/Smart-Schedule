@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Download, FolderOpen, History, Upload } from 'lucide-react';
-import type { Entity, Importance } from '../types';
+import type { Importance } from '../types';
 import { ask, listModels } from '../lib/llm';
 import { S, useStore } from '../store';
 import { addDays, fmtDay, todayISO } from '../lib/date';
 import { desk } from '../lib/bridge';
 import { BlurInput, Field } from './ui';
+import { buildExport, download, exportFileName, parsePlannerFile, type PlannerFile } from '../lib/transfer';
+import { ImportPlanner } from './ImportPlanner';
 import { SheetSync } from './SheetSync';
 import { DEFAULT_ALERT_LEVELS } from './AlertsDock';
 import { cls } from '../lib/id';
@@ -74,16 +76,9 @@ export function SettingsView() {
         <h2>Backups &amp; history</h2>
         <p className="muted small">
           {desk ? 'The desktop app also writes a dated copy of everything to disk once a day (last 60 days kept). ' : ''}
-          You can export everything as one JSON file at any time.
         </p>
-        <div className="inline gap">
-          <button className="btn" onClick={exportJson}>
-            <Download size={14} /> Export JSON
-          </button>
-          <label className="btn">
-            <Upload size={14} /> Import JSON
-            <input type="file" accept="application/json" hidden onChange={(e) => e.target.files?.[0] && importJson(e.target.files[0])} />
-          </label>
+        <Transfer />
+        <div className="inline gap" style={{ marginTop: 10 }}>
           <button className="btn" onClick={() => S().setUI({ view: 'history' })}>
             <History size={14} /> History &amp; trash
           </button>
@@ -132,27 +127,46 @@ function ShortcutField() {
   );
 }
 
-function exportJson() {
-  const { entities } = S();
-  const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), entities }, null, 1)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `planner-${todayISO()}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
-
-async function importJson(file: File) {
-  try {
-    const data = JSON.parse(await file.text());
-    const incoming: Entity[] = Object.values(data.entities ?? {});
-    const cur = S().entities;
-    const newer = incoming.filter((e) => e && e.id && (!cur[e.id] || e.updatedAt > cur[e.id].updatedAt));
-    S().commit(`Imported ${newer.length} items from backup`, newer);
-    S().toast(`Imported ${newer.length} items (kept your newer versions of the rest)`, [{ label: 'Undo', run: () => S().undo() }]);
-  } catch (e) {
-    S().toast(`Couldn’t read that file: ${e instanceof Error ? e.message : e}`);
-  }
+function Transfer() {
+  const connected = useStore((s) => !!(s.settings.syncUrl && s.settings.syncToken));
+  const sheetName = useStore((s) => s.settings.sheetName);
+  const [withSheet, setWithSheet] = useState(true);
+  const [file, setFile] = useState<PlannerFile | null>(null);
+  const exportNow = () => {
+    download(exportFileName(), JSON.stringify(buildExport({ includeSheet: connected && withSheet }), null, 1));
+    S().toast('Planner exported');
+  };
+  const pick = async (f: File) => {
+    try {
+      setFile(parsePlannerFile(await f.text()));
+    } catch (e) {
+      S().toast(`Couldn’t read that file: ${e instanceof Error ? e.message : e}`);
+    }
+  };
+  return (
+    <>
+      <div className="inline gap">
+        <button className="btn primary" onClick={exportNow}>
+          <Download size={14} /> Export planner
+        </button>
+        <label className="btn">
+          <Upload size={14} /> Import planner…
+          <input type="file" accept="application/json,.json" hidden onChange={(e) => (e.target.files?.[0] && pick(e.target.files[0]), (e.target.value = ''))} />
+        </label>
+      </div>
+      {connected && (
+        <label className="check-row small" style={{ marginTop: 8 }}>
+          <input type="checkbox" checked={withSheet} onChange={(e) => setWithSheet(e.target.checked)} />
+          Include the Google Sheet connection{sheetName ? ` (“${sheetName}”)` : ''}, so importing the file reconnects to it — the file then works like a password, keep it private
+        </label>
+      )}
+      <p className="muted small">
+        One file with every task, repeat, bill, project and event, plus your preferences. Use it to keep a copy or to switch between planners — importing asks whether
+        to switch or add, and what should happen to the Google Sheet.
+      </p>
+      {file && <ImportPlanner file={file} onClose={() => setFile(null)} />}
+    </>
+  );
 }
 
 function LocalAi() {

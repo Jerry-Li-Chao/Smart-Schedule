@@ -13,6 +13,7 @@ export interface DeskAPI {
   setBadge(n: number): void;
   setShortcut(accelerator: string): Promise<boolean>;
   openBackups(): void;
+  writeBackup(name: string, json: string): Promise<string>;
   onMenu(cb: (cmd: string) => void): void;
   openCapture(): void;
   llm(method: 'GET' | 'POST', url: string, body?: string): Promise<{ status: number; text: string }>;

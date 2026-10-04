@@ -56,6 +56,7 @@ export function SetupGuide({ onClose, onConnected }: { onClose: () => void; onCo
       const r = await apiCall<{ spreadsheet: string; sheets: string[] }>({ action: 'ping' });
       if (!r.ok) throw new Error(r.error);
       setTest({ ok: true, msg: `Connected to “${r.spreadsheet}”. Your changes will now sync automatically.` });
+      S().setSettings({ sheetName: r.spreadsheet });
       onConnected(r.spreadsheet, r.sheets);
     } catch (e) {
       setTest({ ok: false, msg: e instanceof Error ? e.message : String(e) });

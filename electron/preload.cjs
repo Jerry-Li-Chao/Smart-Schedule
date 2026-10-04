@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('desk', {
   setBadge: (n) => ipcRenderer.send('badge', n),
   setShortcut: (acc) => ipcRenderer.invoke('shortcut:set', acc),
   openBackups: () => ipcRenderer.send('backups:open'),
+  writeBackup: (name, json) => ipcRenderer.invoke('backups:write', name, json),
   llm: (method, url, body) => ipcRenderer.invoke('llm:request', method, url, body),
   openCapture: () => ipcRenderer.send('capture:toggle'),
   onMenu: (cb) => ipcRenderer.on('menu', (_e, cmd) => cb(cmd)),

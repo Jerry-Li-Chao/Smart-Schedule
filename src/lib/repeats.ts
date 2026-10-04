@@ -164,7 +164,7 @@ export function pastRepeats(entities: Record<string, Entity>, today: ISODate): P
   );
   const best = new Map<string, PastRepeat>();
   for (const e of Object.values(entities)) {
-    if (e.type !== 'task' || !e.recurrence || !e.date) continue;
+    if (e.type !== 'task' || !e.recurrence || !e.date || e.purged) continue;
     const ended = !!e.recurrence.until && e.recurrence.until < today;
     if (!e.deleted && !ended) continue;
     const key = e.title.trim().toLowerCase();

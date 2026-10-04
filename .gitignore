@@ -19,3 +19,4 @@ planner-*.json
 *.xls
 *.csv
 __test*
+before-switch-*.json

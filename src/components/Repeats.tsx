@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, CreditCard, History, Hourglass, Plus, RotateCcw, RotateCw, Zap } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, CreditCard, History, Hourglass, Plus, RotateCcw, Trash2, RotateCw, Zap } from 'lucide-react';
 import type { Importance, ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
@@ -30,6 +30,17 @@ export function Repeats({ today }: { today: ISODate }) {
   const live = all.filter((r) => !r.ended);
   const past = useMemo(() => pastRepeats(entities, today), [entities, today]);
   const nudges = past.filter((p) => p.soonIn !== undefined);
+  const [purging, setPurging] = useState<string | null>(null);
+  const purge = (p: PastRepeat) => {
+    // every entry with that name goes, so an older run doesn't take its place
+    const key = p.task.title.trim().toLowerCase();
+    const gone = Object.values(entities).filter(
+      (e): e is Task => e.type === 'task' && !!e.recurrence && e.title.trim().toLowerCase() === key && (!!e.deleted || !!(e.recurrence.until && e.recurrence.until < today)),
+    );
+    S().commit(`Deleted “${p.task.title}” for good`, gone.map((e) => ({ ...e, deleted: true, purged: true })));
+    S().toast(`“${p.task.title}” deleted for good`, [{ label: 'Undo', run: () => S().undo() }]);
+    setPurging(null);
+  };
   const again = (p: PastRepeat) => {
     setForm({ task: p.task, start: p.again < today ? today : p.again });
     document.querySelector('.repeats')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -151,6 +162,20 @@ export function Repeats({ today }: { today: ISODate }) {
                 <button className="btn tiny" onClick={() => again(p)}>
                   <RotateCcw size={12} /> Add again
                 </button>
+                {purging === p.task.id ? (
+                  <span className="pr-confirm">
+                    <button className="btn tiny danger-solid" onClick={() => purge(p)}>
+                      Delete for good
+                    </button>
+                    <button className="btn tiny" onClick={() => setPurging(null)}>
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button className="icon-btn" title="Delete for good — removes it from this history and from Trash" onClick={() => setPurging(p.task.id)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

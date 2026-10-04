@@ -17,6 +17,8 @@ interface Base {
   createdAt: number;
   updatedAt: number;
   deleted?: boolean;
+  /** deleted for good: hidden from Trash and Past repeats too (kept as a tombstone so sync agrees) */
+  purged?: boolean;
   device?: string;
 }
 
@@ -127,6 +129,8 @@ export interface Settings {
   llmModel: string;
   /** Short context sent with every AI question, e.g. where the user lives */
   llmAbout?: string;
+  /** name of the connected spreadsheet, remembered for labels */
+  sheetName?: string;
   /** ISO 4217 code used to show costs, e.g. USD */
   currency?: string;
 }

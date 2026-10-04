@@ -1229,3 +1229,14 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .pr-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pr-ran { white-space: nowrap; }
 .app.mobile .rp-past-row { flex-wrap: wrap; }
+.pr-confirm { display: inline-flex; gap: 4px; }
+.import-dlg { width: min(560px, calc(100vw - 32px)); }
+.imp-body { padding: 4px 18px 14px; display: flex; flex-direction: column; gap: 10px; }
+.imp-file { display: flex; gap: 10px; align-items: flex-start; background: var(--bg); border-radius: 10px; padding: 10px 12px; }
+.imp-opt { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.imp-opt.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.imp-opt input { margin-top: 3px; }
+.imp-sheet { margin: -4px 0 0 30px; display: flex; flex-direction: column; gap: 6px; }
+.imp-sheet .check-row { display: flex; gap: 8px; align-items: flex-start; }
+.imp-sheet .check-row input { margin-top: 2px; }
+.warn-opt b, .confirm-upload { color: var(--must); }

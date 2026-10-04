@@ -198,6 +198,15 @@ ipcMain.handle('shortcut:set', (_e, acc) => {
   else registerShortcut(readPrefs().shortcut || 'CommandOrControl+Shift+Space');
   return ok;
 });
+// a one-off safety copy (e.g. before switching to an imported planner)
+ipcMain.handle('backups:write', async (_e, name, json) => {
+  if (typeof name !== 'string' || !/^[\w.-]+\.json$/.test(name)) throw new Error('bad backup name');
+  fs.mkdirSync(backupDir(), { recursive: true });
+  const file = path.join(backupDir(), name);
+  await fs.promises.writeFile(file, json);
+  return file;
+});
+
 ipcMain.on('backups:open', () => {
   fs.mkdirSync(backupDir(), { recursive: true });
   shell.openPath(backupDir());
