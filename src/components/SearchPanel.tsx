@@ -23,12 +23,34 @@ const KIND: Record<DocKind, { icon: typeof Search; label: string }> = {
 
 const EXAMPLES = ['passport', 'dentist next week', 'bills', 'done last month', 'must', '牙医'];
 
+/**
+ * The last search survives closing the panel — open a result, look, press ⌘K (or "Back to search")
+ * and the query, the answer and the results you already opened are all still there.
+ */
+const last: { q: string; answer: Answer | null; sel: number; visited: Set<string> } = { q: '', answer: null, sel: 0, visited: new Set() };
+/** Forget the last search (the × in the panel, or dismissing the "Back to search" button). */
+export function forgetSearch() {
+  last.q = '';
+  last.answer = null;
+  last.sel = 0;
+  last.visited = new Set();
+  S().setUI({ searchReturn: undefined });
+}
+
 /** ⌘K search over everything in the planner. */
 export function SearchPanel({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
-  const [q, setQ] = useState('');
-  const [sel, setSel] = useState(0);
+  const [q, setQ] = useState(last.q);
+  const [sel, setSel] = useState(last.sel);
+  const [visited, setVisited] = useState(last.visited);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const restored = useRef(!!last.q);
+  useEffect(() => {
+    S().setUI({ searchReturn: undefined });
+    // coming back to a search: select the text, so typing starts a new one and ↑↓ continue the old one
+    if (restored.current) inputRef.current?.select();
+  }, []);
   const close = () => S().setUI({ search: false });
 
   // the index is rebuilt only when the planner changes, not on every keystroke
@@ -67,7 +89,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
 
   // layer 3: answer questions from the retrieved items, streamed from the local LLM
   const llmOk = useStore((s) => !!(s.settings.llmEnabled && s.settings.llmUrl && s.settings.llmModel));
-  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [answer, setAnswer] = useState<Answer | null>(last.answer);
   const abort = useRef<AbortController | null>(null);
   useEffect(() => {
     if (llmOk) warmUp(); // load the model while the user is still typing
@@ -106,7 +128,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
   // questions get an answer by themselves: once meaning results are in, or after ~1 s at most —
   // never held up by a slow embedding call. One automatic answer per question.
   const question = isQuestion(q);
-  const autoFor = useRef('');
+  const autoFor = useRef(last.q.trim());
   useEffect(() => {
     if (!question || !llmOk || autoFor.current === q.trim()) return;
     const go = () => {
@@ -123,13 +145,29 @@ export function SearchPanel({ today }: { today: ISODate }) {
     }
   }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => setSel(0), [q]);
+  useEffect(() => {
+    if (restored.current) return void (restored.current = false); // keep the restored selection once
+    setSel(0);
+  }, [q]);
+  useEffect(() => {
+    last.q = q;
+    last.sel = sel;
+    last.answer = answer?.state === 'done' ? answer : last.answer?.q === q ? last.answer : null;
+  }, [q, sel, answer]);
+  const clear = () => {
+    forgetSearch();
+    setVisited(new Set());
+    setQ('');
+    inputRef.current?.focus();
+  };
   useEffect(() => {
     listRef.current?.querySelector('.sr-row.on')?.scrollIntoView({ block: 'nearest' });
   }, [sel]);
 
   const open = (d: SearchDoc) => {
+    last.visited = new Set(visited).add(d.id);
     close();
+    S().setUI({ searchReturn: q.trim() || undefined });
     if (d.kind === 'project') return S().setUI({ view: 'projects', projectId: d.id });
     if (d.kind === 'repeat') return S().setUI({ view: 'repeats', selectedId: d.id, occDate: undefined });
     if (d.date) jumpTo(d.date);
@@ -153,9 +191,9 @@ export function SearchPanel({ today }: { today: ISODate }) {
       <div className="search-panel" onKeyDown={onKey}>
         <div className="sp-input">
           <Search size={17} />
-          <input autoFocus value={q} placeholder="Search tasks, notes, repeats, projects…" onChange={(e) => setQ(e.target.value)} />
+          <input ref={inputRef} autoFocus value={q} placeholder="Search tasks, notes, repeats, projects…" onChange={(e) => setQ(e.target.value)} />
           {q && (
-            <button className="icon-btn" title="Clear" onClick={() => setQ('')}>
+            <button className="icon-btn" title="Clear and start a new search" onClick={clear}>
               <X size={14} />
             </button>
           )}
@@ -196,13 +234,13 @@ export function SearchPanel({ today }: { today: ISODate }) {
             <div className="sp-empty small muted">{thinking ? 'No word matches — looking for things that mean the same…' : `Nothing found for “${q}”.`}</div>
           )}
           {hits.map((h, i) => (
-            <Row key={h.doc.id} h={h} on={i === sel} today={today} onPick={() => open(h.doc)} onHover={() => setSel(i)} />
+            <Row key={h.doc.id} h={h} on={i === sel} seen={visited.has(h.doc.id)} today={today} onPick={() => open(h.doc)} onHover={() => setSel(i)} />
           ))}
         </div>
         {hits.length > 0 && (
           <div className="sp-foot small muted">
             {hits.length} result{hits.length > 1 ? 's' : ''} · <kbd>↑</kbd>
-            <kbd>↓</kbd> to move · <kbd>↵</kbd> to open
+            <kbd>↓</kbd> to move · <kbd>↵</kbd> to open · this search stays here until you clear it
           </div>
         )}
       </div>
@@ -232,7 +270,7 @@ function noteSnippet(notes: string, terms: string[]): string | null {
   return hit ? hit.trim().slice(0, 120) : null;
 }
 
-function Row({ h, on, today, onPick, onHover }: { h: Hit; on: boolean; today: ISODate; onPick: () => void; onHover: () => void }) {
+function Row({ h, on, seen, today, onPick, onHover }: { h: Hit; on: boolean; seen: boolean; today: ISODate; onPick: () => void; onHover: () => void }) {
   const d = h.doc;
   const K = KIND[d.kind];
   const snippet = noteSnippet(d.notes, h.terms);
@@ -251,6 +289,7 @@ function Row({ h, on, today, onPick, onHover }: { h: Hit; on: boolean; today: IS
         )}
       </div>
       <div className="sr-meta">
+        {seen && <span className="sr-seen" title="You opened this from this search">opened</span>}
         {h.related && (
           <span className="sr-related" title="No word matched — found because it means something similar">
             <Sparkles size={10} /> related

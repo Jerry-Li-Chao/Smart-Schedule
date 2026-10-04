@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarDays, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Search, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
+  ArrowLeft, CalendarDays, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Search, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
 } from 'lucide-react';
 import type { Task } from './types';
 import { S, useStore, type View } from './store';
@@ -22,7 +22,7 @@ import { HistoryView } from './components/HistoryView';
 import { Achievements } from './components/Achievements';
 import { Repeats } from './components/Repeats';
 import { ScriptBanner } from './components/ScriptBanner';
-import { SearchPanel } from './components/SearchPanel';
+import { SearchPanel, forgetSearch } from './components/SearchPanel';
 import { useSemanticIndex } from './lib/search/useSemanticIndex';
 import { SettingsView } from './components/Settings';
 import { ContextMenu } from './components/ItemCard';
@@ -180,6 +180,10 @@ function Shell() {
     <div className={cls('app', desk && 'electron', desk?.platform === 'darwin' && 'mac', mobile && 'mobile', drawerOpen && 'drawer-open')}>
       {!mobile && (
         <nav className="rail">
+          <button className="rail-btn rail-search" title="Search or ask (⌘K)" onClick={() => S().setUI({ search: true })}>
+            <Search size={19} />
+            <span>Search</span>
+          </button>
           {NAV.map(({ view: v, label, icon: Icon }) => (
             <button key={v} className={cls('rail-btn', view === v && 'on')} title={label} onClick={() => S().setUI({ view: v, selectedId: undefined, multi: undefined })}>
               <Icon size={19} />
@@ -220,6 +224,7 @@ function Shell() {
       <TaskDrawer today={today} />
       {planOpen && <PlanModal today={today} />}
       {searchOpen && <SearchPanel today={today} />}
+      {!searchOpen && <SearchReturn />}
       <ContextMenu />
       {!mobile && <AlertsDock today={today} />}
       <DeleteRepeatDialog />
@@ -249,8 +254,8 @@ function TopBar({ today, queueLen }: { today: string; queueLen: number }) {
         <div className="tb-title">{titles[view]}</div>
       )}
       <span className="spacer" />
-      <button className="btn tiny search-top" title="Search everything (⌘K)" onClick={() => S().setUI({ search: true })}>
-        <Search size={13} /> Search <kbd>⌘K</kbd>
+      <button className="search-top" title="Search everything, or ask a question (⌘K)" onClick={() => S().setUI({ search: true })}>
+        <Search size={14} /> <span className="st-label">Search or ask…</span> <kbd>⌘K</kbd>
       </button>
       <button className={cls('btn tiny plan-top', queueLen > 0 && 'pulse')} title="Plan your sticky notes  (P)" onClick={() => S().setUI({ planOpen: true })}>
         <Sparkles size={13} /> Plan{queueLen > 0 ? ` · ${queueLen}` : ''}
@@ -550,6 +555,22 @@ function CaptureWindow() {
           <li key={i.id}>{i.title}</li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+/** After opening a search result: one click (or ⌘K) goes back to the same search and answer. */
+function SearchReturn() {
+  const q = useStore((s) => s.ui.searchReturn);
+  if (!q) return null;
+  return (
+    <div className="search-return">
+      <button className="sr-back" title="Back to this search (⌘K)" onClick={() => S().setUI({ search: true })}>
+        <ArrowLeft size={14} /> Back to search <b>“{q.length > 28 ? q.slice(0, 27) + '…' : q}”</b> <kbd>⌘K</kbd>
+      </button>
+      <button className="icon-btn" title="Done with this search" onClick={forgetSearch}>
+        <X size={14} />
+      </button>
     </div>
   );
 }

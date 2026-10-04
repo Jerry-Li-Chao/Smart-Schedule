@@ -31,6 +31,8 @@ interface UI {
   planOpen: boolean;
   /** ⌘K search panel */
   search?: boolean;
+  /** after opening a search result: the query, for the "Back to search" button */
+  searchReturn?: string;
   /** the meaning-search index being built in the background */
   searchIndex?: { state: 'off' | 'indexing' | 'ready' | 'error'; done: number; total: number; error?: string };
   toast?: Toast;
