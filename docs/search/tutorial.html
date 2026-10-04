@@ -201,7 +201,18 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
     <canvas id="vec" style="width:100%;max-width:440px;aspect-ratio:1;align-self:start;border-radius:12px;background:var(--bg);touch-action:none;cursor:grab"></canvas>
     <div>
       <table><tbody id="cosTable"></tbody></table>
-      <div class="note">If every arrow is stored at length 1 (“normalized”), cosine similarity is just the dot product: <span class="mono">a₁b₁ + a₂b₂ (+ … 1,024 terms)</span>. Comparing a query with 3,000 tasks is 3 million multiply-adds — a few milliseconds. No vector database needed.</div>
+      <div class="note">If every arrow is stored at length 1 (“normalized”), cosine similarity is just the dot product: <span class="mono">a₁b₁ + a₂b₂ (+ … 1,024 terms)</span>.</div>
+      <div class="small" style="margin-top:10px">
+        <b>Why no vector database?</b> To search, we compare the query with <i>every</i> task — “brute force”. Each comparison is 1,024 multiply-adds, so:
+        <table style="margin:6px 0"><thead><tr><th>tasks</th><th class="num">multiply-adds</th><th class="num">time (roughly)</th><th class="num">memory</th></tr></thead><tbody>
+          <tr><td>3,000 (a busy planner)</td><td class="num">3 million</td><td class="num">~3 ms</td><td class="num">12 MB</td></tr>
+          <tr><td>100,000</td><td class="num">100 million</td><td class="num">~160 ms</td><td class="num">400 MB</td></tr>
+          <tr><td>10 million</td><td class="num">10 billion</td><td class="num">~16 s</td><td class="num">40 GB</td></tr>
+        </tbody></table>
+        A planner stays in the first row for years, so a plain loop in the browser is instant, exact (it never misses the best match), and needs nothing to install or keep in sync.
+        <p style="margin:6px 0 0">A <b>vector database</b> (e.g. pgvector, Qdrant, Pinecone) earns its keep around the last row: millions of documents, many users searching at once, or data that doesn't fit in one computer's memory. It builds an <i>approximate nearest-neighbour</i> index (HNSW, IVF…) that only looks at a small, promising part of the vectors — milliseconds instead of seconds, at the cost of occasionally missing a match, extra memory, and a server to run.</p>
+        <p class="muted" style="margin:6px 0 0">Times measured with a plain JavaScript loop on a MacBook (10 million extrapolated); memory is 1,024 numbers × 4 bytes per task.</p>
+      </div>
     </div>
   </div>
 </div>
@@ -638,7 +649,15 @@ function drawVec() {
     cx.fillStyle = v.color; cx.textAlign = 'left'; cx.fillText(v.name, lx + 8, ly + ph / 2 + 0.5);
   }
   cx.fillStyle = ink; cx.beginPath(); cx.arc(c, c, 3.5, 0, Math.PI * 2); cx.fill();
-  $('cosTable').innerHTML = '<tr><th>vs query “teeth”</th><th class="num">angle</th><th class="num">cosine</th></tr>' + arrows.slice(1).map((v) => { const ang = angBetween(q, v); const cos = Math.cos(ang); return `<tr style="${v === focus ? 'background:var(--accent-soft)' : ''}"><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td></tr>`; }).join('');
+  $('cosTable').innerHTML = '<tr><th>vs query “teeth”</th><th class="num">angle</th><th class="num">cosine</th><th>what it means</th></tr>' + arrows.slice(1).map((v) => { const ang = angBetween(q, v); const cos = Math.cos(ang); return `<tr style="${v === focus ? 'background:var(--accent-soft)' : ''}"><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td><td class="small">${meaning(ang)}</td></tr>`; }).join('') + `<tr><td colspan="4" class="small muted" style="padding-top:8px"><b>Reading the numbers:</b> a <b>smaller angle</b> and a <b>cosine closer to 1</b> mean more similar. 0° ↔ cosine 1 (same direction, same meaning) · 90° ↔ cosine 0 (unrelated) · 180° ↔ cosine −1 (opposite). The two always move together — cosine is just a handier number than the angle: 1 is best, and it's what the dot product gives directly.</td></tr>`;
+}
+function meaning(ang) {
+  const d = (ang * 180) / Math.PI;
+  if (d < 25) return '<span style="color:var(--ok)">very similar</span> — nearly the same direction';
+  if (d < 55) return '<span style="color:var(--ok)">related</span>';
+  if (d < 80) return '<span style="color:var(--amber)">loosely related</span>';
+  if (d <= 100) return '<span class="muted">unrelated</span> — close to a right angle';
+  return '<span style="color:#e5484d">opposite direction</span> (rare with real text)';
 }
 function pt(e) { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * L, ((e.clientY - r.top) / r.height) * L]; }
 const tipHit = (x, y) => { const c = L / 2, R = L * 0.33; return arrows.find((v) => Math.hypot(x - (c + Math.cos(v.a) * R), y - (c - Math.sin(v.a) * R)) < 22) ?? null; };
