@@ -166,7 +166,7 @@ carries on alone.
 ## Try it
 
 1. `ollama pull bge-m3`
-2. Settings → **Search by meaning** → wait for "Ready — N items indexed".
+2. Settings → **Search by meaning** (on by default) → wait for "Ready — N items indexed".
 3. ⌘K and search for something you'd *describe* rather than quote.
 
 Then open the browser devtools → Application → IndexedDB → `planner-search` to see the stored

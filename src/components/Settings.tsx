@@ -271,10 +271,10 @@ function MeaningSearch() {
         dates.
       </p>
       <label className="check-row">
-        <input type="checkbox" checked={!!settings.semanticSearch} onChange={(e) => set({ semanticSearch: e.target.checked })} />
+        <input type="checkbox" checked={settings.semanticSearch !== false} onChange={(e) => set({ semanticSearch: e.target.checked })} />
         Search by meaning
       </label>
-      {settings.semanticSearch && (
+      {settings.semanticSearch !== false && (
         <>
           <Field label="Embedding model" hint={<>Multilingual works best for mixed English and Chinese. Install it with <code>ollama pull {model}</code>.</>}>
             <BlurInput

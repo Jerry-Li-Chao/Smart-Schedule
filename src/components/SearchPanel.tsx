@@ -37,7 +37,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
   const textHits = useMemo(() => (q.trim() ? searchText(index, parsed.text, parsed.filters, today) : []), [index, parsed, q, today]);
 
   // layer 2: a moment after typing stops, ask the embedding model and merge what it finds
-  const semantic = useStore((s) => !!s.settings.semanticSearch && s.ui.searchIndex?.state !== 'off');
+  const semantic = useStore((s) => s.settings.semanticSearch !== false && s.ui.searchIndex?.state !== 'off');
   const [vec, setVec] = useState<{ q: string; hits: VecHit[] } | null>(null);
   const [thinking, setThinking] = useState(false);
   useEffect(() => {

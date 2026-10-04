@@ -6,7 +6,7 @@ import { syncIndex } from './vectors';
 
 /** Keep the meaning index current in the background: a few seconds after the planner changes. */
 export function useSemanticIndex() {
-  const on = useStore((s) => !!s.settings.semanticSearch && !!s.settings.llmUrl);
+  const on = useStore((s) => s.settings.semanticSearch !== false && !!s.settings.llmUrl);
   const model = useStore((s) => s.settings.embedModel);
   const entities = useStore((s) => s.entities);
   useEffect(() => {

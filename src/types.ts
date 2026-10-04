@@ -135,7 +135,7 @@ export interface Settings {
   sheetUrl?: string;
   /** name of the connected spreadsheet, remembered for labels */
   sheetName?: string;
-  /** search by meaning: build an embeddings index with the local model below */
+  /** search by meaning (on unless turned off): build an embeddings index with the local model below */
   semanticSearch?: boolean;
   /** Ollama embedding model, e.g. bge-m3 (multilingual) */
   embedModel?: string;
