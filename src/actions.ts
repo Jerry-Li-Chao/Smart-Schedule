@@ -212,6 +212,25 @@ export function moveMany(keys: string[], to: ISODate) {
   S().toast(`Moved ${n} task${n > 1 ? 's' : ''} to ${fmtDay(to)}`, [{ label: 'Undo', run: () => S().undo() }]);
 }
 
+/** Put a selection back on the sticky in one undoable step. Days of repeating tasks stay put. */
+export function unscheduleMany(keys: string[]) {
+  const changed: Task[] = [];
+  let skipped = 0;
+  for (const k of keys) {
+    const [id, date] = k.split('@');
+    const t = getTask(id);
+    if (!t) continue;
+    if (date || t.recurrence) skipped++;
+    else if (t.date !== null) changed.push({ ...t, date: null, stay: undefined });
+  }
+  const n = changed.length;
+  if (n) S().commit(`Put ${n} task${n > 1 ? 's' : ''} back on the sticky`, changed);
+  const skip = skipped ? ` · ${skipped} repeating day${skipped > 1 ? 's' : ''} stayed on the calendar` : '';
+  if (n) S().toast(`${n} task${n > 1 ? 's' : ''} back on the sticky${skip}`, [{ label: 'Undo', run: () => S().undo() }]);
+  else if (skipped) S().toast('Days of repeating tasks stay on the calendar — delete or move them instead.');
+  S().setUI({ multi: undefined });
+}
+
 export function deleteEntity(id: string) {
   const e = S().entities[id];
   if (!e) return;

@@ -4,7 +4,7 @@ import type { ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, nextMonday, weekendOf } from '../lib/date';
 import { cls } from '../lib/id';
-import { capture, deleteEntity, getTask, isInbox, promoteToProject, schedule, updateTask, toggleMulti } from '../actions';
+import { capture, deleteEntity, getTask, isInbox, promoteToProject, schedule, updateTask, toggleMulti, unscheduleMany } from '../actions';
 import { DRAG_MIME, InlineRename, startDrag } from './ItemCard';
 import { useBoxSelect } from '../lib/boxSelect';
 import { DateButton, isSubmitKey } from './ui';
@@ -52,10 +52,7 @@ export function StickyInbox({ today, collapsible }: { today: ISODate; collapsibl
       setOver(false);
       const p = JSON.parse(e.dataTransfer.getData(DRAG_MIME) || '{}');
       if (p.kind !== 'task') {
-        if (p.kind === 'many') {
-          // dragged out of the sticky and dropped back: nothing to do
-          if (!p.keys.every((k: string) => getTask(k)?.date === null)) S().toast('Put tasks back on the sticky one at a time.');
-        }
+        if (p.kind === 'many') unscheduleMany(p.keys);
         else if (p.kind) S().toast(p.kind === 'occ' ? 'One day of a repeating task can’t go back on the sticky — delete or move it instead.' : 'Follow-ups live in their project.');
         return;
       }
