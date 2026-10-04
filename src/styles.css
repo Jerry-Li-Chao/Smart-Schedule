@@ -449,20 +449,6 @@ kbd { font: 10px ui-monospace, Menlo, monospace; border: 1px solid var(--line-st
 .tracker-add { max-width: 520px; }
 
 /* upcoming */
-.upcoming { height: 100%; overflow: auto; padding: 16px 20px 40px; }
-.up-add { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; color: var(--muted); }
-.up-add input { flex: 1; padding: 9px 12px; font-size: 14px; }
-.up-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 22px; align-items: start; }
-.up-col h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); display: flex; align-items: center; gap: 6px; margin: 16px 0 6px; }
-.up-col h3:first-child { margin-top: 0; }
-.up-month { margin-bottom: 12px; }
-.up-month-label { font-weight: 650; margin-bottom: 4px; }
-.up-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; border-left: 3px solid transparent; background: var(--panel); margin-bottom: 3px; }
-.up-row:hover { background: var(--accent-soft); }
-.up-row.lvl-must { border-left-color: var(--must); }
-.up-row.lvl-should { border-left-color: var(--should); }
-.up-date { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; white-space: nowrap; min-width: 70px; }
-.up-title { flex: 1; min-width: 0; }
 
 /* history */
 .history { height: 100%; display: flex; flex-direction: column; }
@@ -502,7 +488,6 @@ kbd { font: 10px ui-monospace, Menlo, monospace; border: 1px solid var(--line-st
 .app.mobile .day-actions, .app.mobile .add-row { opacity: 1; }
 .app.mobile .projects { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 .app.mobile .proj-list { max-height: 34vh; border-right: 0; border-bottom: 1px solid var(--line); }
-.app.mobile .up-grid { grid-template-columns: 1fr; }
 .app.mobile .row3 { grid-template-columns: 1fr; }
 .app.mobile .card { padding: 9px 10px; font-size: 14px; }
 .app.mobile .tb-date { display: none; }
@@ -1215,3 +1200,14 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .rp-cost { font-size: 12.5px; }
 .rp-cost b { font-variant-numeric: tabular-nums; }
 .rp-auto { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--card)); border-radius: 99px; padding: 2px 8px; flex-shrink: 0; }
+.rp-form { background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); border-radius: 14px; padding: 12px 14px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; max-width: 640px; }
+.rf-head { display: flex; align-items: center; }
+.rf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.app.mobile .rf-row { grid-template-columns: 1fr; }
+.rf-every { display: flex; gap: 6px; }
+.rf-every input { width: 64px; }
+.rf-every select { flex: 1; }
+.rf-days { display: flex; gap: 4px; flex-wrap: wrap; }
+.rf-bottom { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.rf-bottom .check-row { display: inline-flex; align-items: center; gap: 5px; }
+.rf-foot { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }

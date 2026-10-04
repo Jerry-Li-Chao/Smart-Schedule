@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarDays, CalendarRange, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
+  CalendarDays, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
 } from 'lucide-react';
 import type { Task } from './types';
 import { S, useStore, type View } from './store';
@@ -18,7 +18,6 @@ import { StickyInbox } from './components/StickyInbox';
 import { TaskDrawer } from './components/TaskDrawer';
 import { PlanModal } from './components/PlanModal';
 import { ProjectsView } from './components/Projects';
-import { Upcoming } from './components/Upcoming';
 import { HistoryView } from './components/HistoryView';
 import { Achievements } from './components/Achievements';
 import { Repeats } from './components/Repeats';
@@ -43,7 +42,6 @@ export function App() {
 const NAV: { view: View; label: string; icon: typeof CalendarDays }[] = [
   { view: 'timeline', label: 'Days', icon: CalendarDays },
   { view: 'projects', label: 'Projects', icon: GitBranch },
-  { view: 'upcoming', label: 'Ahead', icon: CalendarRange },
   { view: 'repeats', label: 'Repeats', icon: Repeat },
   { view: 'wins', label: 'Wins', icon: Trophy },
   { view: 'history', label: 'History', icon: History },
@@ -53,7 +51,7 @@ const MOBILE_NAV: { view: View; label: string; icon: typeof CalendarDays }[] = [
   { view: 'timeline', label: 'Days', icon: CalendarDays },
   { view: 'sticky', label: 'Sticky', icon: StickyNote },
   { view: 'projects', label: 'Projects', icon: GitBranch },
-  { view: 'upcoming', label: 'Ahead', icon: CalendarRange },
+  { view: 'repeats', label: 'Repeats', icon: Repeat },
   { view: 'wins', label: 'Wins', icon: Trophy },
   { view: 'settings', label: 'More', icon: Cog },
 ];
@@ -174,7 +172,6 @@ function Shell() {
           )}
           {view === 'sticky' && <StickyInbox today={today} />}
           {view === 'projects' && <ProjectsView today={today} />}
-          {view === 'upcoming' && <Upcoming today={today} />}
           {view === 'repeats' && <Repeats today={today} />}
           {view === 'wins' && <Achievements today={today} />}
           {view === 'history' && <HistoryView />}
@@ -214,7 +211,7 @@ function TopBar({ today, queueLen }: { today: string; queueLen: number }) {
   const view = useStore((s) => s.ui.view);
   const canUndo = useStore((s) => s.undoStack.length > 0);
   const canRedo = useStore((s) => s.redoStack.length > 0);
-  const titles: Record<View, string> = { timeline: '', sticky: 'Sticky', projects: 'Projects & milestones', upcoming: 'Looking ahead', repeats: 'Repeating things', wins: 'Achievements', history: 'History', settings: 'Settings' };
+  const titles: Record<View, string> = { timeline: '', sticky: 'Sticky', projects: 'Projects & milestones', repeats: 'Repeating things', wins: 'Achievements', history: 'History', settings: 'Settings' };
   return (
     <header className="topbar">
       {view === 'timeline' ? (

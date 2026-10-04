@@ -236,6 +236,13 @@ export function unscheduleMany(keys: string[]) {
   S().setUI({ multi: undefined });
 }
 
+/** Add a fully specified task (e.g. from the Repeats form) as one undoable step. */
+export function createTask(p: Partial<Task> & { title: string }): Task {
+  const t = newTask({ importance: S().settings.defaultImportance ?? 'must', ...p });
+  S().commit(`Added “${t.title}”`, [t]);
+  return t;
+}
+
 export function deleteEntity(id: string) {
   const e = S().entities[id];
   if (!e) return;

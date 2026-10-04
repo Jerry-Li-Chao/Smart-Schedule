@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Repeat, RotateCw, Zap } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Plus, Repeat, RotateCw, Zap } from 'lucide-react';
 import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
 import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
@@ -9,6 +9,7 @@ import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
 import { capture, setItemStatus, updateTask } from '../actions';
 import { isSubmitKey, Segmented } from './ui';
+import { RepeatForm } from './RepeatForm';
 
 const GROUPS: { cadence: Cadence; label: string }[] = [
   { cadence: 'daily', label: 'Daily' },
@@ -25,6 +26,7 @@ export function Repeats({ today }: { today: ISODate }) {
   useStore((s) => s.settings.currency); // re-render amounts when the currency changes
   const [filter, setFilter] = useState<Filter>('all');
   const [v, setV] = useState('');
+  const [form, setForm] = useState(false);
   const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
   const live = all.filter((r) => !r.ended);
   const ended = all.filter((r) => r.ended);
@@ -62,14 +64,21 @@ export function Repeats({ today }: { today: ISODate }) {
         <Repeat size={16} />
         <input
           value={v}
-          placeholder="Add a repeat — e.g. “Pay rent every month on the 1st”, “Streaming $15.49 every month on the 12th autopay”, “Protein shake every day”"
+          placeholder="Type one — “Streaming $15.49 every month on the 12th autopay” — or use New repeat →"
           onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => isSubmitKey(e) && add()}
         />
-        <button className="btn tiny primary" disabled={!v.trim()} onClick={add}>
-          Add
-        </button>
+        {v.trim() ? (
+          <button className="btn tiny primary" onClick={add}>
+            Add
+          </button>
+        ) : (
+          <button className="btn tiny primary" onClick={() => setForm(true)}>
+            <Plus size={13} /> New repeat
+          </button>
+        )}
       </div>
+      {form && <RepeatForm today={today} onDone={() => setForm(false)} />}
 
       <MoneyPanel today={today} />
 
