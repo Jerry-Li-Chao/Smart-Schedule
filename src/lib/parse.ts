@@ -69,6 +69,17 @@ export function parseQuick(input: string, today: ISODate): Parsed {
 
 
 
+  // ---- an end date for a repeat: "until 10/30", "until dec 31 2027", "through 6/1/27" ----
+  let until: ISODate | undefined;
+  take(/\s(?:until|till|thru|through|ends?(?:\s+on)?)\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?=\s)/i, (_m, mo, d, y) => {
+    until = resolveMD(today, Number(mo), Number(d), y ? Number(y) : undefined);
+    return until ? undefined : false;
+  });
+  take(new RegExp(`\\s(?:until|till|thru|through|ends?(?:\\s+on)?)\\s+(${MONTHS.join('|')})[a-z]*\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?,?(?:\\s+(\\d{4}))?(?=\\s)`, 'i'), (_m, mon, d, y) => {
+    until = resolveMD(today, MONTHS.indexOf(mon.toLowerCase().slice(0, 3)) + 1, Number(d), y ? Number(y) : undefined);
+    return until ? undefined : false;
+  });
+
   // ---- recurrence ----
   take(/\bevery\s+(?:week)?days?\b(?=\s)|\bweekdays\b|每个?工作日/i, (m) => {
     if (/^every\s+days?$/i.test(m.trim())) { out.recurrence = { freq: 'daily', interval: 1 }; return; }
@@ -90,6 +101,13 @@ export function parseQuick(input: string, today: ISODate): Parsed {
   take(/\b(daily|weekly|monthly|yearly|annually)\b/i, (m) => {
     const f = m.toLowerCase() === 'annually' ? 'yearly' : m.toLowerCase();
     out.recurrence = { freq: f as Recurrence['freq'], interval: 1 };
+  });
+  // "every month on the 1st", "monthly on the 25th": the day of the month it falls on
+  take(/\s(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)(?:\s+of\s+(?:the|each|every)\s+month)?(?=\s)/i, (_m, d) => {
+    if (out.recurrence?.freq !== 'monthly' || Number(d) < 1 || Number(d) > 31) return false;
+    let c = today;
+    while (fromISO(c).getDate() !== Math.min(Number(d), daysInMonth(fromISO(c).getFullYear(), fromISO(c).getMonth()))) c = addDays(c, 1);
+    out.date = c;
   });
   take(/每天/, () => { out.recurrence = { freq: 'daily', interval: 1 }; });
   take(/每(?:周|星期|礼拜)([一二三四五六日天])/, (_m, c) => {
@@ -170,6 +188,8 @@ export function parseQuick(input: string, today: ISODate): Parsed {
 
   if (byDeadline) out.deadline = out.date;
   if (out.time && !out.date) out.date = today;
+  if (until && out.recurrence) out.recurrence.until = until;
+  else if (until) out.deadline ??= until;
   if (out.recurrence && !out.date) {
     // weekly on several days: start on whichever of those days comes first (today counts)
     const days = out.recurrence.freq === 'weekly' ? out.recurrence.byWeekday ?? [] : [];

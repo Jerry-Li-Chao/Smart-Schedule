@@ -1129,3 +1129,55 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .day .ev { cursor: pointer; }
 .dw-where.is-event { background: color-mix(in srgb, #8b5cf6 14%, var(--card)); border-color: color-mix(in srgb, #8b5cf6 35%, transparent); }
 .dw-where .ev-icon { color: #7c3aed; }
+
+/* ---------- repeats ---------- */
+.repeats { height: 100%; overflow: auto; padding: 14px 20px 40px; }
+.app.mobile .repeats { padding: 10px 12px 30px; }
+.rp-add { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 8px 6px 12px; color: var(--muted); }
+.rp-add input { flex: 1; border: 0; background: transparent; box-shadow: none !important; padding: 6px 2px; }
+.rp-sum { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0 6px; }
+.app.mobile .rp-sum { grid-template-columns: repeat(2, 1fr); }
+.rp-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; cursor: pointer; color: var(--text); }
+.rp-tile b { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.rp-tile span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.rp-tile:hover { border-color: var(--line-strong); }
+.rp-tile.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rp-tile.warn b { color: #c2410c; }
+.rp-filter { font-size: 12.5px; color: var(--muted); margin: 6px 2px; }
+.rp-empty { color: var(--muted); padding: 30px 4px; text-align: center; }
+.rp-group h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 18px 2px 8px; }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.rp-card { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: 12px; padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 5px; transition: box-shadow 0.15s; }
+.rp-card:hover { box-shadow: 0 4px 16px rgba(30, 25, 10, 0.08); }
+.rp-card.lvl-must { border-left-color: var(--must); }
+.rp-card.lvl-should { border-left-color: var(--should); }
+.rp-card.is-event { border-left-color: #8b5cf6; }
+.rp-card.ended { opacity: 0.6; }
+.rp-top { display: flex; align-items: center; gap: 8px; }
+.rp-title { font-weight: 700; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rp-done { flex-shrink: 0; }
+.rp-ok { font-size: 11.5px; color: var(--done); font-weight: 700; display: inline-flex; align-items: center; gap: 3px; }
+.rp-freq { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.rp-next { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.rp-when { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.rp-when.soon { color: #b45309; }
+.rp-when.now { color: var(--accent); }
+.rp-date { font-size: 12.5px; color: var(--muted); }
+.rp-then { font-size: 11.5px; color: var(--muted); }
+.rp-hist { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.rp-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--drop-bg); border: 1px solid var(--line-strong); }
+.rp-dot.done { background: var(--done); border-color: var(--done); }
+.rp-dot.missed { background: var(--must-bg); border-color: var(--must); }
+.rp-dot.dropped { background: transparent; border-style: dashed; }
+.rp-rate { font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+.rp-alert { display: flex; align-items: center; gap: 6px; font-size: 12px; border-radius: 8px; padding: 4px 8px; cursor: default; flex-wrap: wrap; }
+.rp-alert.warn { background: var(--must-bg); color: var(--must); }
+.rp-alert.renew { background: #fff1e6; color: #c2410c; }
+.rp-alert span { flex: 1; }
+.rp-alert .link-btn { color: inherit; font-weight: 700; }
+.rp-until { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.rp-ended { margin-top: 20px; }
+.rp-ended summary { cursor: pointer; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .rp-alert.renew { background: #43230f; color: #fdba74; }
+}

@@ -1,5 +1,5 @@
 import type { ISODate, Recurrence, Task } from '../types';
-import { addDays, daysInMonth, diffDays, fromISO, startOfWeekMon, weekday, WD } from './date';
+import { addDays, daysInMonth, diffDays, fromISO, MONTHS, startOfWeekMon, weekday, WD } from './date';
 
 export function occursOn(r: Recurrence, start: ISODate, d: ISODate): boolean {
   if (d < start) return false;
@@ -56,7 +56,7 @@ export function describeRecurrence(r: Recurrence, start: ISODate): string {
       s = `${every('year')} on ${fromISO(start).getMonth() + 1}/${fromISO(start).getDate()}`;
       break;
   }
-  return r.until ? `${s} until ${r.until}` : s;
+  return r.until ? `${s} until ${MONTHS[fromISO(r.until).getMonth()]} ${fromISO(r.until).getDate()}, ${r.until.slice(0, 4)}` : s;
 }
 
 function ordinal(n: number) {

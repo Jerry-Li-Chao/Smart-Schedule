@@ -6,7 +6,7 @@ import { desk } from './lib/bridge';
 const STORAGE_KEY = 'planner.v1';
 const HISTORY_CAP = 4000;
 
-export type View = 'timeline' | 'sticky' | 'projects' | 'upcoming' | 'wins' | 'history' | 'settings';
+export type View = 'timeline' | 'sticky' | 'projects' | 'upcoming' | 'repeats' | 'wins' | 'history' | 'settings';
 
 interface Change {
   id: string;

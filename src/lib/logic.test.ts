@@ -76,6 +76,17 @@ describe('parseQuick', () => {
   });
 });
 
+describe('monthly day phrases', () => {
+  const p = (s: string) => parseQuick(s, TODAY);
+  it('reads "every month on the 1st"', () => {
+    expect(p('Pay rent every month on the 1st')).toMatchObject({ title: 'Pay rent', date: '2026-10-01', recurrence: { freq: 'monthly', interval: 1 } });
+    expect(p('Pay credit card monthly on the 25th')).toMatchObject({ title: 'Pay credit card', date: '2026-10-25' });
+    expect(p('Read the 2nd chapter')).toMatchObject({ title: 'Read the 2nd chapter' });
+    expect(p('Status report every 6 months until 10/30/27')).toMatchObject({ title: 'Status report', recurrence: { freq: 'monthly', interval: 6, until: '2027-10-30' } });
+    expect(p('Vitamin D every day until dec 31')).toMatchObject({ title: 'Vitamin D', date: TODAY, recurrence: { freq: 'daily', until: '2026-12-31' } });
+  });
+});
+
 describe('all-day events', () => {
   const p = (s: string) => parseQuick(s, TODAY);
   it('reads "all day" and "for N days"', () => {

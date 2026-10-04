@@ -118,3 +118,29 @@ describe('all-day lanes', () => {
     expect(itemsFor(idx, '2026-10-12').map((i) => i.key)).toEqual(['x']); // events never mix into the task list
   });
 });
+
+describe('repeats', () => {
+  it('finds next date, history, misses and an upcoming end', async () => {
+    const { repeatInfo } = await import('./repeats');
+    const today = '2026-10-02';
+    const r = repeatInfo(
+      T({
+        title: 'Protein shake',
+        date: '2026-09-28',
+        recurrence: { freq: 'daily', interval: 1, until: '2026-10-20' },
+        completions: { '2026-09-28': 'done', '2026-09-29': 'done', '2026-09-30': 'deleted', '2026-10-02': 'done' },
+      }),
+      today,
+    );
+    expect(r.today).toBe('done');
+    expect(r.next).toBe(today);
+    expect(r.upcoming).toEqual(['2026-10-03', '2026-10-04', '2026-10-05']);
+    expect(r.recent.map((x) => x.state)).toEqual(['missed', 'done', 'done']); // 10/1, 9/29, 9/28 (9/30 deleted)
+    expect(r.missed).toEqual(['2026-10-01']);
+    expect(r.rate).toBeCloseTo(2 / 3);
+    expect(r.endsIn).toBe(18);
+
+    const rent = repeatInfo(T({ title: 'Rent', date: '2026-01-01', recurrence: { freq: 'monthly', interval: 1 } }), today);
+    expect([rent.next, rent.today, rent.endsIn]).toEqual(['2026-11-01', undefined, undefined]);
+  });
+});

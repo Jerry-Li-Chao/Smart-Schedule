@@ -1,0 +1,221 @@
+import { useMemo, useState } from 'react';
+import { AlertTriangle, CalendarClock, Check, Hourglass, Repeat, RotateCw } from 'lucide-react';
+import type { Importance, ISODate } from '../types';
+import { S, useStore } from '../store';
+import { addMonths, diffDays, fmtDay, relDay } from '../lib/date';
+import { describeRecurrence, occurrenceNumber } from '../lib/recurrence';
+import { repeatInfos, type Cadence, type RepeatInfo } from '../lib/repeats';
+import { cls } from '../lib/id';
+import { capture, setItemStatus, updateTask } from '../actions';
+import { isSubmitKey } from './ui';
+
+const GROUPS: { cadence: Cadence; label: string }[] = [
+  { cadence: 'daily', label: 'Daily' },
+  { cadence: 'weekly', label: 'Weekly' },
+  { cadence: 'monthly', label: 'Monthly' },
+  { cadence: 'yearly', label: 'Yearly & longer' },
+];
+const RANK: Record<Importance, number> = { must: 0, should: 1, could: 2 };
+type Filter = 'all' | 'today' | 'week' | 'missed' | 'ending';
+
+/** Everything that repeats, in one place: what's next, how it's been going, what needs renewing. */
+export function Repeats({ today }: { today: ISODate }) {
+  const entities = useStore((s) => s.entities);
+  const [filter, setFilter] = useState<Filter>('all');
+  const [v, setV] = useState('');
+  const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
+  const live = all.filter((r) => !r.ended);
+  const ended = all.filter((r) => r.ended);
+  const weekEnd = useMemo(() => {
+    const d = new Date(`${today}T12:00:00`);
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  }, [today]);
+
+  const counts = {
+    today: live.filter((r) => r.today === 'open').length,
+    week: live.filter((r) => r.next && r.next <= weekEnd).length,
+    missed: live.filter((r) => r.missed.length).length,
+    ending: live.filter((r) => r.endsIn !== undefined).length,
+  };
+  const pass = (r: RepeatInfo) =>
+    filter === 'all' ||
+    (filter === 'today' && r.today === 'open') ||
+    (filter === 'week' && !!r.next && r.next <= weekEnd) ||
+    (filter === 'missed' && r.missed.length > 0) ||
+    (filter === 'ending' && r.endsIn !== undefined);
+  const sorted = (list: RepeatInfo[]) =>
+    [...list].sort((a, b) => (a.next ?? '9999').localeCompare(b.next ?? '9999') || RANK[a.task.importance] - RANK[b.task.importance]);
+
+  const add = () => {
+    if (!v.trim()) return;
+    const made = capture(v);
+    setV('');
+    if (made.length && !made[0].recurrence) S().toast('Saved — add “every day / week / month…” to make it repeat.');
+  };
+
+  return (
+    <div className="repeats">
+      <div className="rp-add">
+        <Repeat size={16} />
+        <input
+          value={v}
+          placeholder="Add a repeat — e.g. “Pay rent every month on the 1st”, “Protein shake every day”, “Renew passport every 10 years”"
+          onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => isSubmitKey(e) && add()}
+        />
+        <button className="btn tiny primary" disabled={!v.trim()} onClick={add}>
+          Add
+        </button>
+      </div>
+
+      <div className="rp-sum">
+        {(
+          [
+            ['today', 'Due today', counts.today, ''],
+            ['week', 'Next 7 days', counts.week, ''],
+            ['missed', 'Missed lately', counts.missed, counts.missed ? 'warn' : ''],
+            ['ending', 'Ending soon', counts.ending, counts.ending ? 'warn' : ''],
+          ] as const
+        ).map(([k, label, n, tone]) => (
+          <button key={k} className={cls('rp-tile', tone, filter === k && 'on')} onClick={() => setFilter(filter === k ? 'all' : k)}>
+            <b>{n}</b>
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+      {filter !== 'all' && (
+        <div className="rp-filter">
+          Showing: {{ today: 'due today', week: 'happening in the next 7 days', missed: 'missed lately', ending: 'ending soon' }[filter]} ·{' '}
+          <button className="link-btn" onClick={() => setFilter('all')}>
+            show all
+          </button>
+        </div>
+      )}
+
+      {!all.length && (
+        <div className="rp-empty">
+          Nothing repeats yet. Add things like rent, credit card payments, daily habits or renewals above — they all land here, with the next date up front.
+        </div>
+      )}
+
+      {GROUPS.map(({ cadence, label }) => {
+        const list = sorted(live.filter((r) => r.cadence === cadence && pass(r)));
+        if (!list.length) return null;
+        return (
+          <section key={cadence} className="rp-group">
+            <h3>
+              {label} <span className="muted">{list.length}</span>
+            </h3>
+            <div className="rp-grid">
+              {list.map((r) => (
+                <RepeatCard key={r.task.id} r={r} today={today} />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+
+      {ended.length > 0 && filter === 'all' && (
+        <details className="rp-ended">
+          <summary>Ended ({ended.length})</summary>
+          <div className="rp-grid">
+            {ended.map((r) => (
+              <RepeatCard key={r.task.id} r={r} today={today} />
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
+  const t = r.task;
+  const until = t.recurrence!.until;
+  const open = () => S().setUI({ selectedId: t.id, occDate: r.next ?? undefined });
+  const occ = (date: ISODate) => ({ kind: 'occ' as const, key: `${t.id}@${date}`, task: t, date });
+  const extend = (months: number) =>
+    updateTask(t.id, { recurrence: { ...t.recurrence!, until: addMonths(until ?? today, months) } }, `Extended “${t.title}”`);
+  const soon = r.next ? diffDays(today, r.next) : null;
+
+  return (
+    <div className={cls('rp-card', !t.allDay && `lvl-${t.importance}`, t.allDay && 'is-event', r.ended && 'ended')} onClick={open}>
+      <div className="rp-top">
+        <div className="rp-title">{t.title.replace(/\s+#\s*$/, '')}</div>
+        {r.today === 'open' && !t.allDay && (
+          <button
+            className="btn tiny rp-done"
+            title="Done for today"
+            onClick={(e) => {
+              e.stopPropagation();
+              setItemStatus(occ(today), 'done');
+            }}
+          >
+            <Check size={13} /> Done
+          </button>
+        )}
+        {r.today === 'done' && (
+          <span className="rp-ok">
+            <Check size={12} /> today
+          </span>
+        )}
+      </div>
+      <div className="rp-freq">
+        <RotateCw size={11} /> {describeRecurrence(t.recurrence!, t.date!)}
+        {t.time && ` · ${t.time}`}
+      </div>
+
+      <div className="rp-next">
+        {r.next ? (
+          <>
+            <span className={cls('rp-when', soon === 0 && 'now', soon !== null && soon > 0 && soon <= 3 && 'soon')}>{soon === 0 ? 'Today' : relDay(r.next, today)}</span>
+            <span className="rp-date">
+              {fmtDay(r.next, today)}
+              {t.numbering && ` · #${occurrenceNumber(t, r.next)}`}
+            </span>
+          </>
+        ) : (
+          <span className="muted">Ended {until ? fmtDay(until, today) : ''}</span>
+        )}
+      </div>
+      {r.upcoming.length > 0 && <div className="rp-then">then {r.upcoming.map((d) => fmtDay(d, today)).join(' · ')}</div>}
+
+      {!t.allDay && r.recent.length > 0 && (
+        <div className="rp-hist" title="Most recent on the right">
+          {[...r.recent].reverse().map((x) => (
+            <i key={x.date} className={cls('rp-dot', x.state)} title={`${fmtDay(x.date, today)}: ${x.state === 'dropped' ? 'skipped' : x.state}`} />
+          ))}
+          {r.rate !== null && <span className="rp-rate">{Math.round(r.rate * 100)}% done</span>}
+        </div>
+      )}
+
+      {r.missed.length > 0 && !r.ended && (
+        <div className="rp-alert warn" onClick={(e) => e.stopPropagation()}>
+          <AlertTriangle size={12} />
+          <span>Missed {fmtDay(r.missed[0], today)}{r.missed.length > 1 ? ` +${r.missed.length - 1} more` : ''}</span>
+          <button className="link-btn" onClick={() => setItemStatus(occ(r.missed[0]), 'done')}>
+            I did it
+          </button>
+          <button className="link-btn" onClick={() => setItemStatus(occ(r.missed[0]), 'dropped')}>
+            Skip
+          </button>
+        </div>
+      )}
+
+      {r.endsIn !== undefined && (
+        <div className="rp-alert renew" onClick={(e) => e.stopPropagation()}>
+          <Hourglass size={12} />
+          <span>Ends {r.endsIn === 0 ? 'today' : `in ${r.endsIn} day${r.endsIn > 1 ? 's' : ''}`} — renew?</span>
+          <button className="link-btn" onClick={() => extend(6)}>+6 mo</button>
+          <button className="link-btn" onClick={() => extend(12)}>+1 yr</button>
+        </div>
+      )}
+      {until && r.endsIn === undefined && !r.ended && (
+        <div className="rp-until">
+          <CalendarClock size={11} /> until {fmtDay(until, today)}
+        </div>
+      )}
+    </div>
+  );
+}
