@@ -201,7 +201,7 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
     <canvas id="vec" style="width:100%;max-width:440px;aspect-ratio:1;align-self:start;border-radius:12px;background:var(--bg);touch-action:none;cursor:grab"></canvas>
     <div>
       <table><tbody id="cosTable"></tbody></table>
-      <div class="note">If every arrow is stored at length 1 (“normalized”), cosine similarity is just the dot product: <span class="mono">a₁b₁ + a₂b₂ (+ … 1,024 terms)</span>.</div>
+      <div class="note small" id="dotBox"></div>
       <div class="small" style="margin-top:10px">
         <b>Why no vector database?</b> To search, we compare the query with <i>every</i> task — “brute force”. Each comparison is 1,024 multiply-adds, so:
         <table style="margin:6px 0"><thead><tr><th>tasks</th><th class="num">multiply-adds</th><th class="num">time (roughly)</th><th class="num">memory</th></tr></thead><tbody>
@@ -649,6 +649,15 @@ function drawVec() {
     cx.fillStyle = v.color; cx.textAlign = 'left'; cx.fillText(v.name, lx + 8, ly + ph / 2 + 0.5);
   }
   cx.fillStyle = ink; cx.beginPath(); cx.arc(c, c, 3.5, 0, Math.PI * 2); cx.fill();
+  if (focus && focus !== q) {
+    const a1 = Math.cos(q.a), a2 = Math.sin(q.a), b1 = Math.cos(focus.a), b2 = Math.sin(focus.a), f = (x) => x.toFixed(2);
+    $('dotBox').innerHTML = `<b>What is the dot product?</b> A vector is just a list of numbers — one per dimension. In this 2-D picture each arrow is 2 numbers: how far it reaches along dimension 1 (right) and along dimension 2 (up). Live, for the arrows you're looking at:
+      <div class="mono" style="margin:6px 0;line-height:1.7">a = “teeth”            = (a₁, a₂) = (${f(a1)}, ${f(a2)})<br>b = “${esc(focus.name)}” = (b₁, b₂) = (${f(b1)}, ${f(b2)})</div>
+      The <b>dot product</b> multiplies the two lists position by position and adds the results:
+      <div class="mono" style="margin:6px 0">a · b = a₁×b₁ + a₂×b₂ = ${f(a1)}×${f(b1)} + ${f(a2)}×${f(b2)} = <b>${f(a1 * b1 + a2 * b2)}</b></div>
+      — the same number as the cosine in the table. That's not a coincidence: every arrow here has length 1 (“normalized”, it ends on the circle), and for length-1 vectors the dot product <i>is</i> the cosine of the angle between them. So the app never computes an angle — it only multiplies and adds.
+      <p style="margin:6px 0 0"><b>In the real app</b> the embedding model, bge-m3, describes every text with <b>1,024 numbers</b> instead of 2 — a vector in a 1,024-dimensional space. You can't draw that, but the arithmetic is identical, just longer: <span class="mono">a₁b₁ + a₂b₂ + … + a₁₀₂₄b₁₀₂₄</span> — 1,024 multiply-and-add steps per comparison. No single dimension means anything you could name (“dimension 7 = teeth-ness” doesn't exist); meaning is spread across all of them, and only the overall direction matters. The size, 1,024, is a design choice of the model's makers — other models use 384, 768 or 3,072.</p>`;
+  }
   $('cosTable').innerHTML = '<tr><th>vs query “teeth”</th><th class="num">angle</th><th class="num">cosine</th><th>what it means</th></tr>' + arrows.slice(1).map((v) => { const ang = angBetween(q, v); const cos = Math.cos(ang); return `<tr style="${v === focus ? 'background:var(--accent-soft)' : ''}"><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td><td class="small">${meaning(ang)}</td></tr>`; }).join('') + `<tr><td colspan="4" class="small muted" style="padding-top:8px"><b>Reading the numbers:</b> a <b>smaller angle</b> and a <b>cosine closer to 1</b> mean more similar. 0° ↔ cosine 1 (same direction, same meaning) · 90° ↔ cosine 0 (unrelated) · 180° ↔ cosine −1 (opposite). The two always move together — cosine is just a handier number than the angle: 1 is best, and it's what the dot product gives directly.</td></tr>`;
 }
 function meaning(ang) {
