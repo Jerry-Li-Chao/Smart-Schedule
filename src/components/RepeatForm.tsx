@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Plus, X, Zap } from 'lucide-react';
-import type { Importance, ISODate, Recurrence } from '../types';
+import type { Importance, ISODate, Recurrence, Task } from '../types';
 import { S, useStore } from '../store';
-import { weekday, WD } from '../lib/date';
+import { addDays, diffDays, weekday, WD } from '../lib/date';
 import { describeRecurrence } from '../lib/recurrence';
 import { monthlyCost } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
@@ -19,17 +19,21 @@ const UNITS: { freq: Recurrence['freq']; one: string; many: string }[] = [
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 /** Create a repeat right on the Repeats page: name, how often, from when, and what it costs. */
-export function RepeatForm({ today, onDone }: { today: ISODate; onDone: () => void }) {
+export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: () => void; from?: { task: Task; start: ISODate } }) {
   const defImp = useStore((s) => s.settings.defaultImportance ?? 'must');
-  const [title, setTitle] = useState('');
-  const [freq, setFreq] = useState<Recurrence['freq']>('monthly');
-  const [interval, setInterval] = useState(1);
-  const [start, setStart] = useState<ISODate>(today);
-  const [days, setDays] = useState<number[]>([weekday(today)]);
-  const [until, setUntil] = useState('');
-  const [amount, setAmount] = useState('');
-  const [autopay, setAutopay] = useState(false);
-  const [importance, setImportance] = useState<Importance>(defImp);
+  // "Add again" from history: same details, starting on `from.start`, running for the same stretch
+  const r0 = from?.task.recurrence;
+  const s0 = from?.start ?? today;
+  const span = r0?.until && from ? diffDays(from.task.date!, r0.until) : null;
+  const [title, setTitle] = useState(from?.task.title ?? '');
+  const [freq, setFreq] = useState<Recurrence['freq']>(r0?.freq ?? 'monthly');
+  const [interval, setInterval] = useState(r0?.interval ?? 1);
+  const [start, setStart] = useState<ISODate>(s0);
+  const [days, setDays] = useState<number[]>(r0?.byWeekday?.length ? r0.byWeekday : [weekday(s0)]);
+  const [until, setUntil] = useState(span !== null && span !== undefined ? addDays(s0, span) : '');
+  const [amount, setAmount] = useState(from?.task.cost?.amount ? String(from.task.cost.amount) : '');
+  const [autopay, setAutopay] = useState(!!from?.task.cost?.autopay);
+  const [importance, setImportance] = useState<Importance>(from?.task.importance ?? defImp);
 
   const recurrence: Recurrence = useMemo(
     () => ({ freq, interval: Math.max(1, interval || 1), ...(freq === 'weekly' && days.length ? { byWeekday: [...days].sort() } : {}), ...(until ? { until } : {}) }),
@@ -46,16 +50,17 @@ export function RepeatForm({ today, onDone }: { today: ISODate; onDone: () => vo
       date: start,
       recurrence,
       importance,
+      ...(from?.task.notes ? { notes: from.task.notes } : {}),
       ...(cost || autopay ? { cost: { amount: cost, ...(autopay ? { autopay: true } : {}) } } : {}),
     });
-    S().toast(`Added “${title.trim()}” — ${describeRecurrence(recurrence, start).toLowerCase()}`);
+    S().toast(`Added “${title.trim()}” — ${describeRecurrence(recurrence, start).replace(/^E/, 'e')}`);
     onDone();
   };
 
   return (
     <div className="rp-form" onKeyDown={(e) => (e.key === 'Escape' ? onDone() : e.key === 'Enter' && (e.metaKey || e.ctrlKey) && save())}>
       <div className="rf-head">
-        <b>New repeat</b>
+        <b>{from ? `Add “${from.task.title}” again` : 'New repeat'}</b>
         <span className="spacer" />
         <button className="icon-btn" title="Close (Esc)" onClick={onDone}>
           <X size={15} />

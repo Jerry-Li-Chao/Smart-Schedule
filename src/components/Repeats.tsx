@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Plus, RotateCw, Zap } from 'lucide-react';
-import type { Importance, ISODate } from '../types';
+import { AlertTriangle, CalendarClock, Check, CreditCard, History, Hourglass, Plus, RotateCcw, RotateCw, Zap } from 'lucide-react';
+import type { Importance, ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
 import { describeRecurrence, occurrenceNumber } from '../lib/recurrence';
-import { activeBills, chargesBetween, monthlyCost, repeatInfos, type Cadence, type RepeatInfo } from '../lib/repeats';
+import { activeBills, chargesBetween, monthlyCost, pastRepeats, repeatInfos, type Cadence, type PastRepeat, type RepeatInfo } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
 import { setItemStatus, updateTask } from '../actions';
@@ -25,10 +25,15 @@ export function Repeats({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
   useStore((s) => s.settings.currency); // re-render amounts when the currency changes
   const [filter, setFilter] = useState<Filter>('all');
-  const [form, setForm] = useState(false);
+  const [form, setForm] = useState<false | true | { task: Task; start: ISODate }>(false);
   const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
   const live = all.filter((r) => !r.ended);
-  const ended = all.filter((r) => r.ended);
+  const past = useMemo(() => pastRepeats(entities, today), [entities, today]);
+  const nudges = past.filter((p) => p.soonIn !== undefined);
+  const again = (p: PastRepeat) => {
+    setForm({ task: p.task, start: p.again < today ? today : p.again });
+    document.querySelector('.repeats')?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const weekEnd = useMemo(() => {
     const d = new Date(`${today}T12:00:00`);
     d.setDate(d.getDate() + 6);
@@ -61,7 +66,20 @@ export function Repeats({ today }: { today: ISODate }) {
           </button>
         )}
       </div>
-      {form && <RepeatForm today={today} onDone={() => setForm(false)} />}
+      {form && <RepeatForm key={form === true ? 'new' : form.task.id} today={today} from={form === true ? undefined : form} onDone={() => setForm(false)} />}
+      {!form &&
+        nudges.map((p) => (
+          <div key={p.task.id} className="rp-nudge">
+            <RotateCcw size={14} />
+            <span>
+              Last time, <b>{p.task.title.replace(/\s+#\s*$/, '')}</b> started on {fmtDay(p.from, today)}. That comes round again{' '}
+              {p.soonIn === 0 ? 'today' : `in ${p.soonIn} day${p.soonIn === 1 ? '' : 's'}`} — add it again?
+            </span>
+            <button className="btn tiny primary" onClick={() => again(p)}>
+              Add again
+            </button>
+          </div>
+        ))}
 
       <MoneyPanel today={today} />
 
@@ -112,15 +130,31 @@ export function Repeats({ today }: { today: ISODate }) {
         );
       })}
 
-      {ended.length > 0 && filter === 'all' && (
-        <details className="rp-ended">
-          <summary>Ended ({ended.length})</summary>
-          <div className="rp-grid">
-            {ended.map((r) => (
-              <RepeatCard key={r.task.id} r={r} today={today} />
+      {past.length > 0 && filter === 'all' && (
+        <section className="rp-group rp-past">
+          <h3>
+            <History size={13} /> Past repeats <span className="muted">{past.length}</span>
+          </h3>
+          <div className="rp-past-list">
+            {past.map((p) => (
+              <div key={p.task.id} className="rp-past-row">
+                <div className="pr-main">
+                  <b>{p.task.title.replace(/\s+#\s*$/, '')}</b>
+                  <span className="muted small">
+                    {describeRecurrence({ ...p.task.recurrence!, until: undefined }, p.from)}
+                    {p.task.cost?.amount ? ` · ${fmtMoney(p.task.cost.amount)}` : ''}
+                  </span>
+                </div>
+                <span className="pr-ran small muted">
+                  {fmtDay(p.from, today)} – {fmtDay(p.to, today)} · {p.how}
+                </span>
+                <button className="btn tiny" onClick={() => again(p)}>
+                  <RotateCcw size={12} /> Add again
+                </button>
+              </div>
             ))}
           </div>
-        </details>
+        </section>
       )}
     </div>
   );
@@ -244,7 +278,6 @@ function MoneyPanel({ today }: { today: ISODate }) {
 
   const monthly = bills.reduce((a, t) => a + monthlyCost(t), 0);
   const ranked = [...bills].sort((a, b) => monthlyCost(b) - monthlyCost(a));
-  const top = monthlyCost(ranked[0]) || 1;
   const auto = bills.filter((t) => t.cost?.autopay).length;
   const soonTotal = charges.reduce((a, c) => a + c.amount, 0);
   const open = (id: string) => S().setUI({ selectedId: id, occDate: undefined });
@@ -309,19 +342,74 @@ function MoneyPanel({ today }: { today: ISODate }) {
         )}
       </div>
 
-      <div className="money-split">
-        <b>Per month</b>
-        {ranked.slice(0, 8).map((t) => (
-          <div key={t.id} className="mx-row" onClick={() => open(t.id)} title={`${Math.round((monthlyCost(t) / monthly) * 100)}% of the total`}>
-            <span className="mx-name">{t.title.replace(/\s+#\s*$/, '')}</span>
-            <span className="mx-bar">
-              <i style={{ width: `${(monthlyCost(t) / top) * 100}%` }} />
-            </span>
-            <span className="mx-amt">{fmtMoney(monthlyCost(t))}</span>
-          </div>
-        ))}
-        {ranked.length > 8 && <div className="muted small">…and {ranked.length - 8} more</div>}
-      </div>
+      <Donut items={ranked.map((t) => ({ id: t.id, name: t.title.replace(/\s+#\s*$/, ''), value: monthlyCost(t) }))} total={monthly} onPick={open} />
     </section>
+  );
+}
+
+const PALETTE = ['#0f766e', '#22c55e', '#0ea5e9', '#6366f1', '#a855f7', '#ec4899', '#f97316', '#eab308', '#64748b'];
+
+/** Where the monthly total goes: one slice per bill (small ones grouped as "Other"). */
+function Donut({ items, total, onPick }: { items: { id: string; name: string; value: number }[]; total: number; onPick: (id: string) => void }) {
+  const [hover, setHover] = useState<string | null>(null);
+  const MAX = 7;
+  const slices = items.length > MAX ? [...items.slice(0, MAX - 1), { id: '_other', name: `Other (${items.length - MAX + 1})`, value: items.slice(MAX - 1).reduce((a, x) => a + x.value, 0) }] : items;
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  const h = slices.find((x) => x.id === hover);
+  return (
+    <div className="money-split">
+      <b>Per month</b>
+      <div className="donut-wrap">
+        <svg className="donut" viewBox="0 0 140 140" width="140" height="140">
+          <circle cx="70" cy="70" r={R} className="donut-bg" />
+          {slices.map((x, i) => {
+            const len = (x.value / total) * C;
+            const seg = (
+              <circle
+                key={x.id}
+                cx="70"
+                cy="70"
+                r={R}
+                className={cls('donut-seg', hover === x.id && 'on', hover && hover !== x.id && 'dim')}
+                stroke={PALETTE[i % PALETTE.length]}
+                strokeDasharray={`${Math.max(0, len - 1.5)} ${C}`}
+                strokeDashoffset={-acc}
+                onMouseEnter={() => setHover(x.id)}
+                onMouseLeave={() => setHover(null)}
+                onClick={() => x.id !== '_other' && onPick(x.id)}
+              >
+                <title>{`${x.name}: ${fmtMoney(x.value)} (${Math.round((x.value / total) * 100)}%)`}</title>
+              </circle>
+            );
+            acc += len;
+            return seg;
+          })}
+          <text x="70" y="66" className="donut-amt" textAnchor="middle">
+            {fmtMoney(h ? h.value : total, { cents: false })}
+          </text>
+          <text x="70" y="84" className="donut-sub" textAnchor="middle">
+            {h ? `${Math.round((h.value / total) * 100)}%` : 'a month'}
+          </text>
+        </svg>
+        <ul className="donut-legend">
+          {slices.map((x, i) => (
+            <li
+              key={x.id}
+              className={cls(hover === x.id && 'on')}
+              onMouseEnter={() => setHover(x.id)}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => x.id !== '_other' && onPick(x.id)}
+            >
+              <i style={{ background: PALETTE[i % PALETTE.length] }} />
+              <span className="dl-name">{x.name}</span>
+              <span className="dl-amt">{fmtMoney(x.value)}</span>
+              <span className="dl-pct">{Math.round((x.value / total) * 100)}%</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }

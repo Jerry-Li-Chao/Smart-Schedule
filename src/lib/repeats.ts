@@ -130,3 +130,51 @@ export const activeBills = (entities: Record<string, Entity>, today: ISODate) =>
   Object.values(entities).filter(
     (e): e is Task => e.type === 'task' && !e.deleted && !!e.recurrence && !!e.date && !!e.cost?.amount && !(e.recurrence.until && e.recurrence.until < today),
   );
+
+// ---------- history: repeats that ended or were deleted ----------
+
+export interface PastRepeat {
+  task: Task;
+  /** first and last day it ran */
+  from: ISODate;
+  to: ISODate;
+  how: 'ended' | 'deleted';
+  /** the same start date, the next time it comes round (for "add it again") */
+  again: ISODate;
+  /** days until `again` — set when it's coming up soon (a seasonal nudge) */
+  soonIn?: number;
+}
+
+const SEASON_NUDGE = 30; // days ahead
+
+/** Same month and day, next time it comes round on or after `today`. */
+function nextAnniversary(d: ISODate, today: ISODate): ISODate {
+  let y = Number(today.slice(0, 4));
+  let c = `${y}${d.slice(4)}`;
+  if (c < today) c = `${++y}${d.slice(4)}`;
+  return c.endsWith('-02-29') && Number(c.slice(0, 4)) % 4 ? `${c.slice(0, 4)}-02-28` : c;
+}
+
+/** Repeats that have finished or were deleted, newest first; one entry per name. */
+export function pastRepeats(entities: Record<string, Entity>, today: ISODate): PastRepeat[] {
+  const liveTitles = new Set(
+    Object.values(entities)
+      .filter((e): e is Task => e.type === 'task' && !e.deleted && !!e.recurrence && !(e.recurrence.until && e.recurrence.until < today))
+      .map((t) => t.title.trim().toLowerCase()),
+  );
+  const best = new Map<string, PastRepeat>();
+  for (const e of Object.values(entities)) {
+    if (e.type !== 'task' || !e.recurrence || !e.date) continue;
+    const ended = !!e.recurrence.until && e.recurrence.until < today;
+    if (!e.deleted && !ended) continue;
+    const key = e.title.trim().toLowerCase();
+    if (liveTitles.has(key)) continue; // it's running again already
+    const to = ended ? e.recurrence.until! : new Date(e.updatedAt).toISOString().slice(0, 10);
+    const again = nextAnniversary(e.date, today);
+    const gap = diffDays(today, again);
+    const p: PastRepeat = { task: e, from: e.date, to: to < e.date ? e.date : to, how: e.deleted ? 'deleted' : 'ended', again, ...(gap <= SEASON_NUDGE ? { soonIn: gap } : {}) };
+    const prev = best.get(key);
+    if (!prev || p.to > prev.to) best.set(key, p);
+  }
+  return [...best.values()].sort((a, b) => b.to.localeCompare(a.to));
+}

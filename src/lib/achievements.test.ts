@@ -157,3 +157,23 @@ describe('money', () => {
     expect(repeatInfo(weekly, '2026-10-02').missed).toEqual([]); // auto-pay is never "missed"
   });
 });
+
+describe('past repeats', () => {
+  it('keeps ended and deleted repeats, nudges when the season comes back', async () => {
+    const { pastRepeats } = await import('./repeats');
+    const today = '2026-10-02';
+    const list = pastRepeats(
+      db(
+        T({ id: 's', title: 'Ski pass', date: '2025-10-20', recurrence: { freq: 'monthly', interval: 1, until: '2026-03-20' }, cost: { amount: 80 } }),
+        T({ id: 'g', title: 'Garden service', date: '2026-04-01', recurrence: { freq: 'weekly', interval: 1 }, deleted: true, updatedAt: new Date('2026-08-30T12:00').getTime() }),
+        T({ id: 'r', title: 'Rent', date: '2026-01-01', recurrence: { freq: 'monthly', interval: 1 } }),
+        T({ id: 'r0', title: 'rent', date: '2025-01-01', recurrence: { freq: 'monthly', interval: 1, until: '2025-12-01' } }), // running again
+      ),
+      today,
+    );
+    expect(list.map((p) => [p.task.id, p.how, p.from, p.to, p.again, p.soonIn])).toEqual([
+      ['g', 'deleted', '2026-04-01', '2026-08-30', '2027-04-01', undefined],
+      ['s', 'ended', '2025-10-20', '2026-03-20', '2026-10-20', 18],
+    ]);
+  });
+});
