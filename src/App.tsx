@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  CalendarDays, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
+  CalendarDays, Cloud, CloudOff, GitBranch, History, Loader2, Trophy, Repeat, Search, Redo2, Settings as Cog, Sparkles, StickyNote, Undo2, Pin, X,
 } from 'lucide-react';
 import type { Task } from './types';
 import { S, useStore, type View } from './store';
@@ -22,6 +22,7 @@ import { HistoryView } from './components/HistoryView';
 import { Achievements } from './components/Achievements';
 import { Repeats } from './components/Repeats';
 import { ScriptBanner } from './components/ScriptBanner';
+import { SearchPanel } from './components/SearchPanel';
 import { SettingsView } from './components/Settings';
 import { ContextMenu } from './components/ItemCard';
 import { DeleteRepeatDialog } from './components/DeleteRepeatDialog';
@@ -61,6 +62,7 @@ function Shell() {
   const today = useToday();
   const view = useStore((s) => s.ui.view);
   const planOpen = useStore((s) => s.ui.planOpen);
+  const searchOpen = useStore((s) => !!s.ui.search);
   const drawerOpen = useStore((s) => !!s.ui.selectedId && s.entities[s.ui.selectedId]?.type === 'task' && !s.entities[s.ui.selectedId]?.deleted);
   const entities = useStore((s) => s.entities);
   const mobile = useIsMobile();
@@ -120,6 +122,11 @@ function Shell() {
     const onKey = (e: KeyboardEvent) => {
       const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
       const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === 'k' && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        S().setUI({ search: !S().ui.search });
+        return;
+      }
       if (mod && e.key.toLowerCase() === 'z' && !typing && !desk) {
         e.preventDefault();
         if (e.shiftKey) S().redo();
@@ -159,6 +166,7 @@ function Shell() {
       else if (cmd === 'redo') editing ? document.execCommand('redo') : S().redo();
       else if (cmd === 'today') jumpTo(todayISO());
       else if (cmd === 'plan') S().setUI({ planOpen: true });
+      else if (cmd === 'search') S().setUI({ search: !S().ui.search });
       else if (cmd === 'new') focusSticky();
       else if (cmd === 'sync') void syncNow();
       else if (cmd === 'zoom-in' || cmd === 'zoom-out' || cmd === 'zoom-reset')
@@ -209,6 +217,7 @@ function Shell() {
       )}
       <TaskDrawer today={today} />
       {planOpen && <PlanModal today={today} />}
+      {searchOpen && <SearchPanel today={today} />}
       <ContextMenu />
       {!mobile && <AlertsDock today={today} />}
       <DeleteRepeatDialog />
@@ -238,6 +247,9 @@ function TopBar({ today, queueLen }: { today: string; queueLen: number }) {
         <div className="tb-title">{titles[view]}</div>
       )}
       <span className="spacer" />
+      <button className="btn tiny search-top" title="Search everything (⌘K)" onClick={() => S().setUI({ search: true })}>
+        <Search size={13} /> Search <kbd>⌘K</kbd>
+      </button>
       <button className={cls('btn tiny plan-top', queueLen > 0 && 'pulse')} title="Plan your sticky notes  (P)" onClick={() => S().setUI({ planOpen: true })}>
         <Sparkles size={13} /> Plan{queueLen > 0 ? ` · ${queueLen}` : ''}
       </button>

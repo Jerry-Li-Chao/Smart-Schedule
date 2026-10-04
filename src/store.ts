@@ -29,6 +29,8 @@ interface UI {
   occDate?: ISODate;
   projectId?: string;
   planOpen: boolean;
+  /** ⌘K search panel */
+  search?: boolean;
   toast?: Toast;
   syncing: boolean;
   jump?: { date: ISODate; n: number };

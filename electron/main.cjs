@@ -277,6 +277,7 @@ function buildMenu() {
       submenu: [
         { label: 'Today', accelerator: 'CmdOrCtrl+T', click: () => send('today') },
         { label: 'Plan…', accelerator: 'CmdOrCtrl+P', click: () => send('plan') },
+        { label: 'Search…', accelerator: 'CmdOrCtrl+K', click: () => send('search') },
       ],
     },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { label: 'Actual Size (days)', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-reset') }, { label: 'Zoom In (fewer, bigger days)', accelerator: 'CmdOrCtrl+=', click: () => send('zoom-in') }, { label: 'Zoom Out (more days)', accelerator: 'CmdOrCtrl+-', click: () => send('zoom-out') }, { type: 'separator' }, { role: 'togglefullscreen' }] },
