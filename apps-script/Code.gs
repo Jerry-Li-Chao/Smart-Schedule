@@ -238,7 +238,7 @@ function readLegacy_(name) {
 
 // ---------------------------------------------------------------- read-only calendar mirror
 
-var COLORS = { must: '#ff0000', should: '#ffff00', could: '#ffffff', done: '#00ff00', dropped: '#b7b7b7' };
+var COLORS = { must: '#ff0000', should: '#ffff00', could: '#ffffff', done: '#00ff00', dropped: '#b7b7b7', event: '#e4d7fb' };
 
 function renderCalendar_(rows) {
   var ss = SpreadsheetApp.getActive();
@@ -322,10 +322,15 @@ function itemsOn_(data, date) {
     if (t.recurrence) {
       var st = (t.completions && t.completions[date]) || 'open';
       if (st !== 'deleted' && st !== 'moved' && occursOn_(t.recurrence, t.date, date)) items.push({ t: t, status: st, date: date });
+    } else if (t.allDay && t.date && t.date <= date && date <= (t.endDate || t.date)) {
+      // all-day events cover every day of their span: "Vacation (2/4)"
+      var total = t.endDate && t.endDate > t.date ? daysBetween_(t.date, t.endDate) + 1 : 1;
+      items.push({ t: t, status: 'open', span: total > 1 ? daysBetween_(t.date, date) + 1 + '/' + total : '' });
     } else if (t.date === date) items.push({ t: t, status: t.status });
   }
   items.sort(function (a, b) {
-    return (a.t.time || '99').localeCompare(b.t.time || '99') || a.t.order - b.t.order;
+    // all-day events first, like the app pins them to the top
+    return (b.t.allDay ? 1 : 0) - (a.t.allDay ? 1 : 0) || (a.t.time || '99').localeCompare(b.t.time || '99') || a.t.order - b.t.order;
   });
   for (var pid in data.projects) {
     var entries = (data.projects[pid].tracker && data.projects[pid].tracker.entries) || [];
@@ -347,10 +352,12 @@ function numbered_(t, date) {
 
 function cellText_(it) {
   var label = (it.t.time ? fmtTime_(it.t.time) + ' ' : '') + (it.date ? numbered_(it.t, it.date) : it.t.title);
+  if (it.t.allDay) return it.span ? label + ' (' + it.span + ')' : label;
   if (it.t.firstScheduled && it.t.date > it.t.firstScheduled && it.status !== 'done') label += ' (cont.)';
   return label;
 }
 function cellColor_(it) {
+  if (it.t.allDay) return COLORS.event;
   return it.status === 'done' ? COLORS.done : it.status === 'dropped' ? COLORS.dropped : COLORS[it.t.importance] || '#ffffff';
 }
 
@@ -476,6 +483,12 @@ function addDays_(iso, n) {
   var p = iso.split('-');
   var d = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
   return d.getFullYear() + '-' + pad_(d.getMonth() + 1) + '-' + pad_(d.getDate());
+}
+/** b − a in whole days */
+function daysBetween_(a, b) {
+  var p = a.split('-');
+  var q = b.split('-');
+  return Math.round((Date.UTC(+q[0], +q[1] - 1, +q[2]) - Date.UTC(+p[0], +p[1] - 1, +p[2])) / 86400000);
 }
 function pad_(n) {
   return (n < 10 ? '0' : '') + n;

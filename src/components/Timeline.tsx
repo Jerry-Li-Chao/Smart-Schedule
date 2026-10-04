@@ -266,7 +266,7 @@ function EventBand({ events, lanes }: { events: DayEvent[]; lanes: number }) {
           <div
             key={ev.key}
             data-card
-            className={cls('ev', ev.n === 1 && 'ev-start', ev.n === ev.total && 'ev-end', sel === t.id && 'selected', `lvl-${t.importance}`)}
+            className={cls('ev', ev.n === 1 && 'ev-start', ev.n === ev.total && 'ev-end', sel === t.id && 'selected')}
             style={{ top: ev.lane * EV_H }}
             title={ev.total > 1 ? `${t.title} — day ${ev.n} of ${ev.total}` : t.title}
             draggable

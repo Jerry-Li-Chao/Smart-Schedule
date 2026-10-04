@@ -216,21 +216,28 @@ export function ContextMenu() {
   } else {
     const t = item.task;
     const status = itemStatus(item);
-    entries.push([status === 'done' ? 'Mark not done' : 'Done', () => setItemStatus(item, status === 'done' ? 'open' : 'done')]);
-    entries.push([status === 'dropped' ? 'Not obsolete' : 'Obsolete (no longer needed)', () => setItemStatus(item, status === 'dropped' ? 'open' : 'dropped')]);
-    if (item.kind === 'task') {
-      entries.push(['Doing', () => setItemStatus(item, 'doing')], ['Waiting on someone', () => setItemStatus(item, 'waiting')], '-');
-      entries.push(['Must', () => updateTask(t.id, { importance: 'must' })], ['Should', () => updateTask(t.id, { importance: 'should' })], ['Could', () => updateTask(t.id, { importance: 'could' })], '-');
-      entries.push(['Move to tomorrow', () => schedule(t.id, addDays(t.date && t.date > todayIso ? t.date : todayIso, 1))]);
-      entries.push(['Move to next week', () => schedule(t.id, nextMonday(todayIso))]);
-      entries.push(['Back to sticky (unschedule)', () => schedule(t.id, null)], '-');
-      entries.push([t.allDay ? 'Not all-day (back to a task)' : 'All day — pin to the top', () => updateTask(t.id, t.allDay ? { allDay: undefined, endDate: undefined } : { allDay: true, time: undefined })], '-');
-      entries.push(['Duplicate', () => duplicateTask(t.id)], ['Delete', () => requestDelete(t.id)]);
+    if (t.allDay) {
+      // an event: just where it sits, never done/importance
+      if (item.kind === 'task') entries.push(['Move a day later', () => schedule(t.id, addDays(t.date!, 1))], ['Move a day earlier', () => schedule(t.id, addDays(t.date!, -1))], '-');
+      entries.push(['Not all-day (back to a task)', () => updateTask(t.id, { allDay: undefined, endDate: undefined })], ['Open', () => S().setUI({ selectedId: t.id, occDate: item.kind === 'occ' ? item.date : undefined })], '-');
+      entries.push(['Duplicate', () => duplicateTask(t.id)], ['Delete', () => requestDelete(t.id, item.kind === 'occ' ? item.date : undefined)]);
     } else {
-      entries.push('-');
-      entries.push(['Move this one to tomorrow', () => moveOccurrence(t, item.date, addDays(item.date, 1))]);
-      entries.push(['Edit repeating task', () => S().setUI({ selectedId: t.id, occDate: item.date })]);
-      entries.push('-', ['Delete…', () => requestDelete(t.id, item.date)]);
+      entries.push([status === 'done' ? 'Mark not done' : 'Done', () => setItemStatus(item, status === 'done' ? 'open' : 'done')]);
+      entries.push([status === 'dropped' ? 'Not obsolete' : 'Obsolete (no longer needed)', () => setItemStatus(item, status === 'dropped' ? 'open' : 'dropped')]);
+      if (item.kind === 'task') {
+        entries.push(['Doing', () => setItemStatus(item, 'doing')], ['Waiting on someone', () => setItemStatus(item, 'waiting')], '-');
+        entries.push(['Must', () => updateTask(t.id, { importance: 'must' })], ['Should', () => updateTask(t.id, { importance: 'should' })], ['Could', () => updateTask(t.id, { importance: 'could' })], '-');
+        entries.push(['Move to tomorrow', () => schedule(t.id, addDays(t.date && t.date > todayIso ? t.date : todayIso, 1))]);
+        entries.push(['Move to next week', () => schedule(t.id, nextMonday(todayIso))]);
+        entries.push(['Back to sticky (unschedule)', () => schedule(t.id, null)], '-');
+        entries.push(['All day — pin to the top', () => updateTask(t.id, { allDay: true, time: undefined })], '-');
+        entries.push(['Duplicate', () => duplicateTask(t.id)], ['Delete', () => requestDelete(t.id)]);
+      } else {
+        entries.push('-');
+        entries.push(['Move this one to tomorrow', () => moveOccurrence(t, item.date, addDays(item.date, 1))]);
+        entries.push(['Edit repeating task', () => S().setUI({ selectedId: t.id, occDate: item.date })]);
+        entries.push('-', ['Delete…', () => requestDelete(t.id, item.date)]);
+      }
     }
   }
   const x = Math.min(menu.x, window.innerWidth - 230);

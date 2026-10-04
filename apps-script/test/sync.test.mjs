@@ -162,6 +162,12 @@ assert.ok(!col(2).some(([v]) => v === 'stale cell' || v === 'another stale'), 'o
 assert.deepEqual(L[0].slice(4), ['10/3', '10/4'], 'new date columns appended for later tasks');
 assert.ok(col(5).some(([v, bg]) => v === 'Vehicle renewal' && bg === '#ff0000'), 'task in the new column');
 assert.ok(!call({ action: 'ping' }).sheets.includes('2026 Planner (backup before Planner)'), 'backup hidden from import list');
+// an all-day span shows on every day it covers, on top, in the event colour
+res = call({ action: 'sync', since: 0, device: 'Mac', changes: [task('t_ev', 'Vacation', 5500, { date: '2026-10-02', endDate: '2026-10-04', allDay: true })] });
+assert.equal(res.ok, true, res.error);
+assert.deepEqual([3, 4, 5].map((c) => legacy.data[1][c]), ['Vacation (1/3)', 'Vacation (2/3)', 'Vacation (3/3)'], 'span on each day, first row');
+assert.equal(legacy.bg[1][3], '#e4d7fb');
+assert.ok(col(5).some(([v]) => v === 'Vehicle renewal'), 'the day\'s task is still there, below the event');
 assert.equal(call({ action: 'unlink' }).ok, true);
 call({ action: 'sync', since: 0, device: 'Mac', changes: [task('t_l1', 'renamed after unlink', 6000, { date: '2026-10-01', time: '07:55' })] });
 assert.equal(legacy.data[1][2], '7:55AM Call the bank', 'unlinked tab no longer changes');

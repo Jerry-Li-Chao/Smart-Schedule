@@ -47,14 +47,14 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
   const rawOcc = occDate ? t.completions?.[occDate] : undefined;
   const occState = rawOcc === 'deleted' || rawOcc === 'moved' ? undefined : rawOcc;
 
-  const where = t.recurrence ? 'Repeating' : t.projectId ? 'Project step' : t.date ? relDay(t.date, today) : 'On the sticky';
+  const where = t.allDay ? (t.endDate && t.date ? `All day · ${diffDays(t.date, t.endDate) + 1} days` : 'All day') : t.recurrence ? 'Repeating' : t.projectId ? 'Project step' : t.date ? relDay(t.date, today) : 'On the sticky';
 
   return (
     <aside className="drawer">
       <div className="dw-scroll">
         <div className="dw-top">
-          <span className={cls('dw-where', `lvl-${eff.level}`)}>
-            <span className={cls('lvl-dot', `lvl-${eff.level}`)} />
+          <span className={cls('dw-where', t.allDay ? 'is-event' : `lvl-${eff.level}`)}>
+            {t.allDay ? <CalendarDays size={12} className="ev-icon" /> : <span className={cls('lvl-dot', `lvl-${eff.level}`)} />}
             {where}
             {t.date && !t.recurrence && <span className="muted"> · {fmtDay(t.date, today)}</span>}
           </span>
@@ -81,7 +81,7 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
 
         <AiBox t={t} />
 
-        {occDate && t.recurrence && (
+        {occDate && t.recurrence && !t.allDay && (
           <Section icon={<Repeat size={14} />} title={`This day · ${fmtDay(occDate, today)}`}>
             <Segmented<'open' | 'done' | 'dropped'>
               className="full"
@@ -96,38 +96,41 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
           </Section>
         )}
 
-        <Section icon={<CircleDot size={14} />} title="Status & priority">
-          {!t.recurrence && (
-            <Segmented<Status>
-              className="full"
-              value={t.status}
-              onChange={(status) => up({ status }, `Status of “${t.title}” → ${status}`)}
-              options={[
-                { value: 'open', label: 'To do' },
-                { value: 'doing', label: 'Doing' },
-                { value: 'waiting', label: 'Waiting', title: 'Ball is in someone else’s court' },
-                { value: 'done', label: 'Done', className: 'g' },
-                { value: 'dropped', label: 'Obsolete', className: 'x' },
-              ]}
-            />
-          )}
-          <div className="sub-label">If this slips a week…</div>
-          <div className="imp-pick">
-            {(['could', 'should', 'must'] as Importance[]).map((k, i) => (
-              <button key={k} className={cls(`ip-${k}`, t.importance === k && 'on')} onClick={() => up({ importance: k }, `“${t.title}” → ${k}`)} title={IMPORTANCE_HELP[k].hint}>
-                <span className="bars">
-                  {[0, 1, 2].map((j) => (
-                    <i key={j} className={cls(j <= i && 'on')} />
-                  ))}
-                </span>
-                {IMPORTANCE_HELP[k].label}
-              </button>
-            ))}
-          </div>
-          <div className="field-hint">
-            {eff.reason ? <span className="urgent-text">Showing as {eff.level} because it’s {eff.reason}.</span> : IMPORTANCE_HELP[t.importance].hint}
-          </div>
-        </Section>
+        {/* all-day events are context (a holiday, a trip), not to-dos: no status or importance */}
+        {!t.allDay && (
+          <Section icon={<CircleDot size={14} />} title="Status & priority">
+            {!t.recurrence && (
+              <Segmented<Status>
+                className="full"
+                value={t.status}
+                onChange={(status) => up({ status }, `Status of “${t.title}” → ${status}`)}
+                options={[
+                  { value: 'open', label: 'To do' },
+                  { value: 'doing', label: 'Doing' },
+                  { value: 'waiting', label: 'Waiting', title: 'Ball is in someone else’s court' },
+                  { value: 'done', label: 'Done', className: 'g' },
+                  { value: 'dropped', label: 'Obsolete', className: 'x' },
+                ]}
+              />
+            )}
+            <div className="sub-label">If this slips a week…</div>
+            <div className="imp-pick">
+              {(['could', 'should', 'must'] as Importance[]).map((k, i) => (
+                <button key={k} className={cls(`ip-${k}`, t.importance === k && 'on')} onClick={() => up({ importance: k }, `“${t.title}” → ${k}`)} title={IMPORTANCE_HELP[k].hint}>
+                  <span className="bars">
+                    {[0, 1, 2].map((j) => (
+                      <i key={j} className={cls(j <= i && 'on')} />
+                    ))}
+                  </span>
+                  {IMPORTANCE_HELP[k].label}
+                </button>
+              ))}
+            </div>
+            <div className="field-hint">
+              {eff.reason ? <span className="urgent-text">Showing as {eff.level} because it’s {eff.reason}.</span> : IMPORTANCE_HELP[t.importance].hint}
+            </div>
+          </Section>
+        )}
 
         <Section
           icon={<CalendarDays size={14} />}
@@ -184,19 +187,21 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
           )}
           <div className="divider" />
           <RepeatField t={t} today={today} occDate={occDate} />
-          <div className="row2">
-            <Field label="Hard deadline" hint={t.deadline ? relDay(t.deadline, today) : 'Escalates colour as it nears'}>
-              <div className="input-clear">
-                <input type="date" value={t.deadline ?? ''} onChange={(e) => up({ deadline: e.target.value || undefined })} />
-                {t.deadline && (
-                  <button className="icon-btn" title="Clear deadline" onClick={() => up({ deadline: undefined })}>
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </Field>
-            <ReminderField t={t} />
-          </div>
+          {!t.allDay && (
+            <div className="row2">
+              <Field label="Hard deadline" hint={t.deadline ? relDay(t.deadline, today) : 'Escalates colour as it nears'}>
+                <div className="input-clear">
+                  <input type="date" value={t.deadline ?? ''} onChange={(e) => up({ deadline: e.target.value || undefined })} />
+                  {t.deadline && (
+                    <button className="icon-btn" title="Clear deadline" onClick={() => up({ deadline: undefined })}>
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </Field>
+              <ReminderField t={t} />
+            </div>
+          )}
         </Section>
 
         <Section icon={<FolderTree size={14} />} title="Project">
