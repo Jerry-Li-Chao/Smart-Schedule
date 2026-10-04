@@ -4,7 +4,7 @@ import { SortToggle } from './SortToggle';
 import type { DayItem, ISODate, Project, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, diffDays, fromISO, MONTHS, WD, weekday } from '../lib/date';
-import { itemsFor } from '../lib/dayIndex';
+import { eventsFor, itemsFor, type DayEvent } from '../lib/dayIndex';
 import { useDayIndex, useIsMobile } from '../lib/hooks';
 import { useBoxSelect } from '../lib/boxSelect';
 import { cls } from '../lib/id';
@@ -170,8 +170,10 @@ export function Timeline({ today }: { today: ISODate }) {
       if (!k) regular.push(it);
       else tracks.set(k, [...(tracks.get(k) ?? []), it]);
     }
-    return { date, regular, tracks };
+    return { date, regular, tracks, events: eventsFor(idx, date) };
   });
+  // one band height for every visible day, so multi-day events line up as bars
+  const eventLanes = colData.reduce((m, c) => Math.max(m, ...c.events.map((e) => e.lane + 1)), 0);
   const chunk = Math.floor(first / 14) * 14;
   const trackRows = useMemo(() => {
     const max = new Map<string, number>();
@@ -213,7 +215,7 @@ export function Timeline({ today }: { today: ISODate }) {
   const tracksCapH = Math.min(allTrackH, MAX_TRACK_CARDS * (TRACK_CARD_H + 6));
   const totalCards = trackRows.reduce((s, r) => s + Math.round((r.h + 4) / (TRACK_CARD_H + 4)), 0);
   const tracksH = trackRows.length ? 32 + (tracksCollapsed ? 0 : tracksCapH) : 0;
-  const pageH = Math.max(vh, (HEAD_H + tallest + tracksH + 40) * tz);
+  const pageH = Math.max(vh, (HEAD_H + eventLanes * EV_H + tallest + tracksH + 40) * tz);
 
   useBoxSelect(ref);
 
@@ -221,12 +223,14 @@ export function Timeline({ today }: { today: ISODate }) {
     <div className={cls('timeline', mobile && 'snap')} ref={ref} onScroll={onScroll} style={{ '--tlz': tz } as React.CSSProperties}>
       <div className="tl-track" style={{ width: TOTAL * colW, height: pageH }}>
         {snapPoints}
-        {colData.map(({ date, regular, tracks }) => (
+        {colData.map(({ date, regular, tracks, events }) => (
           <DayColumn
             key={date}
             date={date}
             today={today}
             items={regular}
+            events={events}
+            eventLanes={eventLanes}
             tracks={tracks}
             trackRows={trackRows}
             collapsed={tracksCollapsed}
@@ -248,6 +252,42 @@ export function Timeline({ today }: { today: ISODate }) {
 }
 
 const HEAD_H = 38;
+const EV_H = 26;
+
+/** All-day events pinned above the day's tasks; a multi-day one keeps its lane so it reads as a bar. */
+function EventBand({ events, lanes }: { events: DayEvent[]; lanes: number }) {
+  const sel = useStore((s) => s.ui.selectedId);
+  return (
+    <div className="day-events" style={{ height: lanes * EV_H }}>
+      {events.map((ev) => {
+        const t = ev.task;
+        const item: DayItem = t.recurrence ? { kind: 'occ', key: ev.key, task: t, date: ev.date } : { kind: 'task', key: t.id, task: t };
+        return (
+          <div
+            key={ev.key}
+            data-card
+            className={cls('ev', ev.n === 1 && 'ev-start', ev.n === ev.total && 'ev-end', sel === t.id && 'selected', `lvl-${t.importance}`)}
+            style={{ top: ev.lane * EV_H }}
+            title={ev.total > 1 ? `${t.title} — day ${ev.n} of ${ev.total}` : t.title}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(DRAG_MIME, JSON.stringify(t.recurrence ? { kind: 'occ', id: t.id, date: ev.date } : { kind: 'task', id: t.id, offset: ev.n - 1 }));
+              e.dataTransfer.effectAllowed = 'move';
+            }}
+            onClick={() => S().setUI({ selectedId: t.id, occDate: t.recurrence ? ev.date : undefined, multi: undefined })}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              S().setUI({ menu: { x: e.clientX, y: e.clientY, item } });
+            }}
+          >
+            <span className="ev-title">{t.title}</span>
+            {ev.total > 1 && <span className="ev-n">{ev.n}/{ev.total}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 const MAX_TRACK_CARDS = 3;
 
 // Every day has its own copy of the strip; keep them scrolled to the same row so they stay aligned.
@@ -281,6 +321,8 @@ interface ColProps {
   date: ISODate;
   today: ISODate;
   items: DayItem[];
+  events: DayEvent[];
+  eventLanes: number;
   tracks: Map<string, DayItem[]>;
   trackRows: { key: string; h: number }[];
   collapsed: boolean;
@@ -296,7 +338,7 @@ interface ColProps {
   onHeaderWheel: (e: React.WheelEvent) => void;
 }
 
-const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRows, collapsed, capH, hiddenRows, tz, onMeasure, projects, left, width, dropIndex, setDrop, onHeaderWheel }: ColProps) {
+const DayColumn = memo(function DayColumn({ date, today, items, events, eventLanes, tracks, trackRows, collapsed, capH, hiddenRows, tz, onMeasure, projects, left, width, dropIndex, setDrop, onHeaderWheel }: ColProps) {
   const listRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = listRef.current!;
@@ -364,6 +406,7 @@ const DayColumn = memo(function DayColumn({ date, today, items, tracks, trackRow
         </div>
       </header>
       <div className="day-body">
+      {eventLanes > 0 && <EventBand events={events} lanes={eventLanes} />}
       <div className="day-list" ref={listRef}>
         {items.map((it, i) => (
           <div key={it.key} className={cls('slot', dropIndex === i && 'drop-before')}>
@@ -446,6 +489,12 @@ function handleDrop(p: DragPayload, date: ISODate, index: number, items: DayItem
   }
   const t = getTask(p.id);
   if (!t) return;
+  if (t.allDay) {
+    // grabbed on day n of a span: keep that day under the cursor
+    const start = addDays(date, -(p.offset ?? 0));
+    if (start !== t.date) schedule(t.id, start);
+    return;
+  }
   const others = items.filter((i) => !(i.kind === 'task' && i.task.id === t.id));
   const draggedIdx = items.findIndex((i) => i.kind === 'task' && i.task.id === t.id);
   const at = draggedIdx >= 0 && draggedIdx < index ? index - 1 : index;

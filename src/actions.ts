@@ -85,14 +85,16 @@ export function taskFromParsed(p: Parsed, extra: Partial<Task> = {}): Task {
   // repeating + "#" (optionally "#42") → numbered: each day shows its own number
   const num = p.recurrence ? /#(\d+)?/.exec(short.title) : null;
   if (num) extra = { ...extra, numbering: { start: num[1] ? Number(num[1]) : 1 } };
+  const allDay = p.allDay && !!date;
   return newTask({
     title: num ? short.title.replace(/#\d+/, '#') : short.title,
     date,
-    time: p.time,
+    time: allDay ? undefined : p.time,
     importance: p.importance ?? S().settings.defaultImportance ?? 'must',
     recurrence: p.recurrence,
     deadline: p.deadline,
-    remindAt: defaultReminder(date, p.time, today),
+    remindAt: allDay ? undefined : defaultReminder(date, p.time, today),
+    ...(allDay ? { allDay: true, ...(p.days && p.days > 1 && !p.recurrence ? { endDate: addDays(date!, p.days - 1) } : {}) } : {}),
     ...extra,
   });
 }
@@ -154,7 +156,9 @@ export function updateTask(id: string, patch: Partial<Task>, label?: string) {
 export function schedule(id: string, date: ISODate | null, order?: number) {
   const t = getTask(id);
   if (!t) return;
-  updateTask(id, { date, ...(order !== undefined ? { order } : {}) }, date ? `Moved “${t.title}” → ${fmtDay(date)}` : `Unscheduled “${t.title}”`);
+  // a multi-day event moves as a whole
+  const endDate = t.endDate && t.date && date ? addDays(t.endDate, diffDays(t.date, date)) : t.endDate;
+  updateTask(id, { date, ...(order !== undefined ? { order } : {}), ...(endDate !== t.endDate ? { endDate } : {}) }, date ? `Moved “${t.title}” → ${fmtDay(date)}` : `Unscheduled “${t.title}”`);
 }
 
 export function setItemStatus(item: DayItem, status: Status) {
@@ -393,7 +397,7 @@ export function duplicateTask(id: string) {
 /** Unfinished, untimed tasks from past days move to today (no more copying them forward by hand). */
 export function carryOver(today = todayISO()) {
   const moved = tasks()
-    .filter((t) => t.date && t.date < today && !t.time && !t.recurrence && !t.stay && !isClosed(t))
+    .filter((t) => t.date && t.date < today && !t.time && !t.recurrence && !t.allDay && !t.stay && !isClosed(t))
     .map((t) => ({ ...t, date: today, firstScheduled: t.firstScheduled ?? t.date! }));
   if (moved.length) S().commit(`Carried ${moved.length} unfinished task${moved.length > 1 ? 's' : ''} to today`, moved, { undoable: false });
 }

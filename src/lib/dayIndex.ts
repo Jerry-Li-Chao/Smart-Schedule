@@ -4,6 +4,10 @@ import { occursOn } from './recurrence';
 
 export interface DayIndex {
   byDate: Map<ISODate, Task[]>;
+  /** one-off all-day events with the row ("lane") they keep on every day they cover */
+  events: { task: Task; lane: number }[];
+  /** repeating all-day events (one day per occurrence) */
+  eventSeries: Task[];
   series: Task[];
   follows: Map<ISODate, { project: Project; entry: TrackerEntry }[]>;
   projects: Record<string, Project>;
@@ -13,6 +17,8 @@ export function buildDayIndex(entities: Record<string, Entity>): DayIndex {
   const byDate = new Map<ISODate, Task[]>();
   const follows = new Map<ISODate, { project: Project; entry: TrackerEntry }[]>();
   const series: Task[] = [];
+  const spans: Task[] = [];
+  const eventSeries: Task[] = [];
   const projects: Record<string, Project> = {};
   for (const e of Object.values(entities)) {
     if (e.deleted) continue;
@@ -24,15 +30,56 @@ export function buildDayIndex(entities: Record<string, Entity>): DayIndex {
         list.push({ project: e, entry });
         follows.set(entry.followUp, list);
       }
-    } else if (e.recurrence && e.date) series.push(e);
+    } else if (e.allDay && e.date) (e.recurrence ? eventSeries : spans).push(e);
+    else if (e.recurrence && e.date) series.push(e);
     else if (e.date) {
       const list = byDate.get(e.date) ?? [];
       list.push(e);
       byDate.set(e.date, list);
     }
   }
-  return { byDate, series, follows, projects };
+  // greedy lanes: a multi-day event keeps the same row on every day it covers
+  spans.sort((a, b) => a.date!.localeCompare(b.date!) || spanEnd(b).localeCompare(spanEnd(a)) || a.order - b.order);
+  const laneEnds: ISODate[] = [];
+  const events = spans.map((task) => {
+    let lane = laneEnds.findIndex((end) => end < task.date!);
+    if (lane < 0) lane = laneEnds.length;
+    laneEnds[lane] = spanEnd(task);
+    return { task, lane };
+  });
+  return { byDate, series, follows, projects, events, eventSeries };
 }
+
+const spanEnd = (t: Task) => (t.endDate && t.endDate > t.date! ? t.endDate : t.date!);
+
+export interface DayEvent {
+  key: string;
+  task: Task;
+  date: ISODate;
+  lane: number;
+  /** position inside a multi-day span: day `n` of `total` */
+  n: number;
+  total: number;
+}
+
+/** All-day events covering this day, each in its lane. */
+export function eventsFor(idx: DayIndex, date: ISODate): DayEvent[] {
+  const out: DayEvent[] = [];
+  for (const { task, lane } of idx.events) {
+    const end = spanEnd(task);
+    if (task.date! <= date && date <= end)
+      out.push({ key: `${task.id}#${date}`, task, date, lane, n: diff(task.date!, date) + 1, total: diff(task.date!, end) + 1 });
+  }
+  let free = out.reduce((m, e) => Math.max(m, e.lane + 1), 0);
+  for (const s of idx.eventSeries) {
+    const state = s.completions?.[date];
+    if (state !== 'deleted' && state !== 'moved' && occursOn(s.recurrence!, s.date!, date))
+      out.push({ key: `${s.id}@${date}`, task: s, date, lane: free++, n: 1, total: 1 });
+  }
+  return out.sort((a, b) => a.lane - b.lane);
+}
+
+const diff = (a: ISODate, b: ISODate) => Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8)) - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8))) / 86400000);
 
 const timeKey = (t: Task) => t.time ?? '99:99';
 const RANK = { must: 0, should: 1, could: 2 } as const;

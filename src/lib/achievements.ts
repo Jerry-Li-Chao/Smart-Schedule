@@ -161,7 +161,8 @@ export function computeStats(entities: Record<string, Entity>, period: Period, t
     chronotype = { kind: kind as 'morning', share: n / timed.length };
   }
 
-  const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
+  // all-day events (holidays, trips) are context, not to-dos
+  const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted && !e.allDay);
 
   const habits: Habit[] = [];
   for (const t of tasks) {
@@ -258,7 +259,7 @@ export function lastImportDay(entities: Record<string, Entity>): ISODate | undef
 
 export function computeTrend(entities: Record<string, Entity>, range: TrendRange, today: ISODate): { unit: 'day' | 'week' | 'month'; points: TrendPoint[]; importDay?: ISODate } {
   const wins = allWins(entities);
-  const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted);
+  const tasks = Object.values(entities).filter((e): e is Task => e.type === 'task' && !e.deleted && !e.allDay);
 
   let start: ISODate;
   if (range === 'all') {

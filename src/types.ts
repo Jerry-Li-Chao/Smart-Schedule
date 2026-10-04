@@ -26,6 +26,10 @@ export interface Task extends Base {
   notes?: string;
   /** Scheduled day. null = still on the sticky (inbox). */
   date: ISODate | null;
+  /** an all-day event (holiday, day off, trip): pinned above the day's tasks, never carried over */
+  allDay?: boolean;
+  /** all-day only: last day it covers (inclusive), for multi-day spans like a 4-day vacation */
+  endDate?: ISODate;
   /** HH:MM — a task with a time is an appointment and is never carried over. */
   time?: string;
   importance: Importance;

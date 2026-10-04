@@ -76,6 +76,14 @@ describe('parseQuick', () => {
   });
 });
 
+describe('all-day events', () => {
+  const p = (s: string) => parseQuick(s, TODAY);
+  it('reads "all day" and "for N days"', () => {
+    expect(p('Thanksgiving nov 26 all day')).toMatchObject({ title: 'Thanksgiving', date: '2026-11-26', allDay: true });
+    expect(p('Vacation oct 10 for 4 days')).toMatchObject({ title: 'Vacation', date: '2026-10-10', allDay: true, days: 4 });
+  });
+});
+
 describe('splitCapture', () => {
   it('splits a pasted numbered sticky, folding sub-bullets into notes', () => {
     const text = `1. Set up a meeting with Alex tmr 9AM.

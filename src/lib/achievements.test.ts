@@ -101,3 +101,20 @@ describe('trend', () => {
     expect(at('2026-10-02').left).toBe(0);
   });
 });
+
+describe('all-day lanes', () => {
+  it('keeps a multi-day event in one lane and stacks overlaps', async () => {
+    const { buildDayIndex, eventsFor, itemsFor } = await import('./dayIndex');
+    const idx = buildDayIndex(
+      db(
+        T({ id: 'v', title: 'Vacation', date: '2026-10-10', endDate: '2026-10-13', allDay: true }),
+        T({ id: 'h', title: 'Holiday', date: '2026-10-12', allDay: true }),
+        T({ id: 'x', title: 'Pack', date: '2026-10-12' }),
+      ),
+    );
+    expect(eventsFor(idx, '2026-10-10').map((e) => [e.task.id, e.lane, e.n, e.total])).toEqual([['v', 0, 1, 4]]);
+    expect(eventsFor(idx, '2026-10-12').map((e) => [e.task.id, e.lane, e.n])).toEqual([['v', 0, 3], ['h', 1, 1]]);
+    expect(eventsFor(idx, '2026-10-14')).toEqual([]);
+    expect(itemsFor(idx, '2026-10-12').map((i) => i.key)).toEqual(['x']); // events never mix into the task list
+  });
+});

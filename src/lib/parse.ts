@@ -16,6 +16,9 @@ export interface Parsed {
   importance?: Importance;
   recurrence?: Recurrence;
   deadline?: ISODate;
+  /** "all day" / "全天", or a length like "for 4 days" */
+  allDay?: boolean;
+  days?: number;
 }
 
 const WD_NAMES = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -56,6 +59,13 @@ export function parseQuick(input: string, today: ISODate): Parsed {
     s = s.replace(re, (...m: string[]) => (fn(...m) === false ? m[0] : ' '));
   };
   let byDeadline = false;
+
+  // all-day events: "Thanksgiving nov 26 all day", "Vacation oct 10 for 4 days", "休假 10月10日 4天"
+  take(/\s(?:all[- ]day|全天)(?=\s)/i, () => { out.allDay = true; });
+  take(/\sfor\s+(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+days?(?=\s)/i, (_m, n) => {
+    out.days = /\d/.test(n) ? Number(n) : NUM_WORDS[n.toLowerCase()];
+    out.allDay = true;
+  });
 
 
 

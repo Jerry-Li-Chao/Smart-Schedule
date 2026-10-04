@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays, CircleDot, Copy, FolderTree, History, NotebookPen, RefreshCw, Repeat, Sparkles, Trash2, X } from 'lucide-react';
 import type { ISODate, Importance, Recurrence, Status, Task } from '../types';
 import { S, useStore } from '../store';
-import { addDays, addMonths, fmtDay, fmtTime, localDateTime, nextMonday, parseLocalDateTime, relDay } from '../lib/date';
+import { addDays, addMonths, diffDays, fmtDay, fmtTime, localDateTime, nextMonday, parseLocalDateTime, relDay } from '../lib/date';
 import { describeRecurrence, numberedTitle } from '../lib/recurrence';
 import { effectiveLevel, IMPORTANCE_HELP } from '../lib/priority';
 import { cls } from '../lib/id';
@@ -144,10 +144,29 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
             <Field label={t.recurrence ? 'Starts' : 'Day'}>
               <input type="date" value={t.date ?? ''} onChange={(e) => up({ date: e.target.value || null })} />
             </Field>
-            <Field label="Time">
-              <input type="time" value={t.time ?? ''} onChange={(e) => up({ time: e.target.value || undefined })} />
-            </Field>
+            {t.allDay && !t.recurrence ? (
+              <Field label="Last day" hint={t.endDate && t.date ? `${diffDays(t.date, t.endDate) + 1} days` : 'Just this day'}>
+                <input
+                  type="date"
+                  value={t.endDate ?? ''}
+                  min={t.date ?? undefined}
+                  onChange={(e) => up({ endDate: e.target.value && t.date && e.target.value > t.date ? e.target.value : undefined })}
+                />
+              </Field>
+            ) : !t.allDay ? (
+              <Field label="Time">
+                <input type="time" value={t.time ?? ''} onChange={(e) => up({ time: e.target.value || undefined })} />
+              </Field>
+            ) : null}
           </div>
+          <label className="check-row small" title="Holidays, days off, trips: pinned above the day's tasks, never carried over">
+            <input
+              type="checkbox"
+              checked={!!t.allDay}
+              onChange={(e) => up(e.target.checked ? { allDay: true, time: undefined } : { allDay: undefined, endDate: undefined }, e.target.checked ? `Pinned “${t.title}” as all-day` : `“${t.title}” is a regular task again`)}
+            />
+            All day — pin to the top (holiday, day off, trip)
+          </label>
           {!t.recurrence && (
             <div className="chip-row">
               {[

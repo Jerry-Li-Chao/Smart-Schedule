@@ -10,7 +10,7 @@ import { itemKey, toggleMulti, cycleImportance, duplicateTask, requestDelete, sc
 
 export const DRAG_MIME = 'text/x-planner';
 export type DragPayload =
-  | { kind: 'task'; id: string }
+  | { kind: 'task'; id: string; offset?: number }
   | { kind: 'occ'; id: string; date: ISODate }
   | { kind: 'follow'; projectId: string; entryId: string }
   | { kind: 'many'; keys: string[] };
@@ -224,6 +224,7 @@ export function ContextMenu() {
       entries.push(['Move to tomorrow', () => schedule(t.id, addDays(t.date && t.date > todayIso ? t.date : todayIso, 1))]);
       entries.push(['Move to next week', () => schedule(t.id, nextMonday(todayIso))]);
       entries.push(['Back to sticky (unschedule)', () => schedule(t.id, null)], '-');
+      entries.push([t.allDay ? 'Not all-day (back to a task)' : 'All day — pin to the top', () => updateTask(t.id, t.allDay ? { allDay: undefined, endDate: undefined } : { allDay: true, time: undefined })], '-');
       entries.push(['Duplicate', () => duplicateTask(t.id)], ['Delete', () => requestDelete(t.id)]);
     } else {
       entries.push('-');
