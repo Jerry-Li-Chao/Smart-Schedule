@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, CircleCheck, FolderKanban, Repeat, Search, StickyNote, X } from 'lucide-react';
+import { CalendarDays, CircleCheck, FolderKanban, Loader2, Repeat, Search, Sparkles, StickyNote, X } from 'lucide-react';
 import type { ISODate } from '../types';
 import { S, useStore } from '../store';
 import { fmtDay } from '../lib/date';
@@ -7,7 +7,9 @@ import { cls } from '../lib/id';
 import { jumpTo } from '../actions';
 import { buildDocs, type DocKind, type SearchDoc } from '../lib/search/docs';
 import { parseQuery } from '../lib/search/query';
-import { buildTextIndex, highlightRanges, normalize, searchText, type TextHit } from '../lib/search/text';
+import { buildTextIndex, highlightRanges, normalize, searchText } from '../lib/search/text';
+import { searchVectors, type VecHit } from '../lib/search/vectors';
+import { fuse, type Hit } from '../lib/search/hybrid';
 
 const KIND: Record<DocKind, { icon: typeof Search; label: string }> = {
   task: { icon: CalendarDays, label: 'Task' },
@@ -30,7 +32,36 @@ export function SearchPanel({ today }: { today: ISODate }) {
   // the index is rebuilt only when the planner changes, not on every keystroke
   const index = useMemo(() => buildTextIndex(buildDocs(entities, today)), [entities, today]);
   const parsed = useMemo(() => parseQuery(q, today), [q, today]);
-  const hits = useMemo(() => (q.trim() ? searchText(index, parsed.text, parsed.filters, today) : []), [index, parsed, q, today]);
+  const textHits = useMemo(() => (q.trim() ? searchText(index, parsed.text, parsed.filters, today) : []), [index, parsed, q, today]);
+
+  // layer 2: a moment after typing stops, ask the embedding model and merge what it finds
+  const semantic = useStore((s) => !!s.settings.semanticSearch && s.ui.searchIndex?.state !== 'off');
+  const [vec, setVec] = useState<{ q: string; hits: VecHit[] } | null>(null);
+  const [thinking, setThinking] = useState(false);
+  useEffect(() => {
+    const text = parsed.text.trim();
+    if (!semantic || text.length < 3) return setVec(null);
+    let live = true;
+    const t = setTimeout(async () => {
+      setThinking(true);
+      try {
+        const hits = await searchVectors(text, index.docs);
+        if (live) setVec({ q: text, hits });
+      } catch {
+        if (live) setVec(null); // model unavailable: text results alone are still fine
+      } finally {
+        if (live) setThinking(false);
+      }
+    }, 220);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [parsed.text, semantic, index]);
+  const hits: Hit[] = useMemo(
+    () => fuse(textHits, vec && vec.q === parsed.text.trim() ? vec.hits : [], parsed.filters),
+    [textHits, vec, parsed],
+  );
 
   useEffect(() => setSel(0), [q]);
   useEffect(() => {
@@ -67,6 +98,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
               <X size={14} />
             </button>
           )}
+          {thinking && <Loader2 size={14} className="spin" aria-label="Searching by meaning" />}
           <kbd>esc</kbd>
         </div>
         {chips.length > 0 && (
@@ -93,7 +125,9 @@ export function SearchPanel({ today }: { today: ISODate }) {
               </div>
             </div>
           )}
-          {q.trim() && !hits.length && <div className="sp-empty small muted">Nothing found for “{q}”.</div>}
+          {q.trim() && !hits.length && (
+            <div className="sp-empty small muted">{thinking ? 'No word matches — looking for things that mean the same…' : `Nothing found for “${q}”.`}</div>
+          )}
           {hits.map((h, i) => (
             <Row key={h.doc.id} h={h} on={i === sel} today={today} onPick={() => open(h.doc)} onHover={() => setSel(i)} />
           ))}
@@ -131,7 +165,7 @@ function noteSnippet(notes: string, terms: string[]): string | null {
   return hit ? hit.trim().slice(0, 120) : null;
 }
 
-function Row({ h, on, today, onPick, onHover }: { h: TextHit; on: boolean; today: ISODate; onPick: () => void; onHover: () => void }) {
+function Row({ h, on, today, onPick, onHover }: { h: Hit; on: boolean; today: ISODate; onPick: () => void; onHover: () => void }) {
   const d = h.doc;
   const K = KIND[d.kind];
   const snippet = noteSnippet(d.notes, h.terms);
@@ -150,6 +184,11 @@ function Row({ h, on, today, onPick, onHover }: { h: TextHit; on: boolean; today
         )}
       </div>
       <div className="sr-meta">
+        {h.related && (
+          <span className="sr-related" title="No word matched — found because it means something similar">
+            <Sparkles size={10} /> related
+          </span>
+        )}
         {d.projectTitle && <span className="sr-proj">{d.projectTitle}</span>}
         <span>{d.kind === 'repeat' ? K.label : d.date ? fmtDay(d.date, today) : K.label}</span>
       </div>

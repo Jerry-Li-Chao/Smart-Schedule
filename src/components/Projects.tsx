@@ -49,7 +49,7 @@ export function ProjectsView({ today }: { today: ISODate }) {
             </button>
           );
         })}
-        {!list.length && <Empty>Long-horizon things live here: applications, visa steps, job hunts, anything with milestones.</Empty>}
+        {!list.length && <Empty>Long-horizon things live here: applications, renovations, job hunts, anything with milestones.</Empty>}
       </nav>
       {current ? <ProjectDetail key={current.id} p={current} steps={steps.filter((s) => s.projectId === current.id)} today={today} /> : <div className="proj-detail" />}
     </div>

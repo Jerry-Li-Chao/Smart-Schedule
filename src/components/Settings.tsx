@@ -8,6 +8,8 @@ import { desk } from '../lib/bridge';
 import { BlurInput, Field } from './ui';
 import { buildExport, download, exportFileName, parsePlannerFile, type PlannerFile } from '../lib/transfer';
 import { ClearPlanner, ImportPlanner } from './ImportPlanner';
+import { buildDocs } from '../lib/search/docs';
+import { clearIndex, DEFAULT_EMBED_MODEL, syncIndex } from '../lib/search/vectors';
 import { SheetSync } from './SheetSync';
 import { DEFAULT_ALERT_LEVELS } from './AlertsDock';
 import { cls } from '../lib/id';
@@ -21,6 +23,8 @@ export function SettingsView() {
       <SheetSync />
 
       <LocalAi />
+
+      <MeaningSearch />
 
       <section>
         <h2>Timeline range</h2>
@@ -248,6 +252,66 @@ function SavedCopies({ onPick }: { onPick: (text: string) => void }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** Layer 2 of search: an embeddings index built with a local model. */
+function MeaningSearch() {
+  const settings = useStore((s) => s.settings);
+  const ix = useStore((s) => s.ui.searchIndex);
+  const set = S().setSettings;
+  const model = settings.embedModel || DEFAULT_EMBED_MODEL;
+  const pct = ix && ix.total ? Math.round((ix.done / ix.total) * 100) : 0;
+  return (
+    <section>
+      <h2>Search by meaning</h2>
+      <p className="muted small">
+        Lets ⌘K search find things by what they mean, not just the words — “teeth” finds “看牙医”, “car paperwork” finds “Renew vehicle registration”. It uses a
+        local embedding model through the same server as the AI above (Ollama); nothing leaves this computer. Without it, search still matches words, typos and
+        dates.
+      </p>
+      <label className="check-row">
+        <input type="checkbox" checked={!!settings.semanticSearch} onChange={(e) => set({ semanticSearch: e.target.checked })} />
+        Search by meaning
+      </label>
+      {settings.semanticSearch && (
+        <>
+          <Field label="Embedding model" hint={<>Multilingual works best for mixed English and Chinese. Install it with <code>ollama pull {model}</code>.</>}>
+            <BlurInput
+              value={model}
+              onCommit={async (v) => {
+                const next = v.trim() || DEFAULT_EMBED_MODEL;
+                if (next === model) return;
+                await clearIndex(); // vectors from different models can't be compared
+                set({ embedModel: next });
+              }}
+            />
+          </Field>
+          <div className="small">
+            {ix?.state === 'indexing' && (
+              <span>
+                Indexing… {ix.done} / {ix.total}
+                <span className="ix-bar">
+                  <i style={{ width: `${pct}%` }} />
+                </span>
+              </span>
+            )}
+            {ix?.state === 'ready' && <span className="ok-text">Ready — {ix.total} items indexed.</span>}
+            {ix?.state === 'error' && <span className="err-text">Couldn’t build the index: {ix.error}</span>}
+            {' '}
+            <button
+              className="link-btn"
+              onClick={async () => {
+                await clearIndex();
+                void syncIndex(buildDocs(S().entities, todayISO()));
+              }}
+            >
+              Rebuild
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

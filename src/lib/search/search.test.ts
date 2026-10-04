@@ -73,3 +73,20 @@ describe('search', () => {
     expect(highlightRanges('看牙医', ['牙', '医'])).toEqual([[1, 3]]);
   });
 });
+
+describe('fusing text and meaning results', () => {
+  it('ranks by position in each list, marks meaning-only finds, and applies filters', async () => {
+    const { fuse } = await import('./hybrid');
+    const docs = buildDocs(data, today);
+    const byId = (id: string) => docs.find((d) => d.id === id)!;
+    const text = [{ doc: byId('b'), score: 9, coverage: 1, terms: ['dentist'] }];
+    const vec = [
+      { doc: byId('d'), sim: 0.76 }, // 看牙医 — no shared words with "teeth"
+      { doc: byId('b'), sim: 0.7 },
+      { doc: byId('c'), sim: 0.6 },
+    ];
+    const out = fuse(text, vec, {});
+    expect(out.map((h) => [h.doc.id, h.related])).toEqual([['b', false], ['d', true], ['c', true]]); // in both lists → first
+    expect(fuse(text, vec, { status: 'done' }).map((h) => h.doc.id)).toEqual(['b', 'c']); // text hits were filtered already
+  });
+});

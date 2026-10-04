@@ -43,7 +43,7 @@ export const llmReady = () => {
   return !!(llmEnabled && llmUrl && llmModel);
 };
 
-async function request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
+export async function request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<unknown> {
   const url = S().settings.llmUrl.replace(/\/+$/, '') + path;
   const json = body === undefined ? undefined : JSON.stringify(body);
   if (desk) {

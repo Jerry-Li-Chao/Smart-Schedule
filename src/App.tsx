@@ -23,6 +23,7 @@ import { Achievements } from './components/Achievements';
 import { Repeats } from './components/Repeats';
 import { ScriptBanner } from './components/ScriptBanner';
 import { SearchPanel } from './components/SearchPanel';
+import { useSemanticIndex } from './lib/search/useSemanticIndex';
 import { SettingsView } from './components/Settings';
 import { ContextMenu } from './components/ItemCard';
 import { DeleteRepeatDialog } from './components/DeleteRepeatDialog';
@@ -97,6 +98,7 @@ function Shell() {
 
   useSyncLoop();
   useReminders();
+  useSemanticIndex();
   const llmKey = useStore((s) => `${s.settings.llmEnabled}|${s.settings.llmUrl}|${s.settings.llmModel}`);
   useEffect(() => {
     void checkLlm();

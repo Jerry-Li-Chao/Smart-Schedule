@@ -150,7 +150,7 @@ export interface TextHit {
   terms: string[];
 }
 
-function passes(d: SearchDoc, f: Filters): boolean {
+export function passes(d: SearchDoc, f: Filters): boolean {
   if (f.status === 'done' && d.status !== 'done') return false;
   if (f.status === 'open' && d.status !== 'open') return false;
   if (f.importance && d.importance !== f.importance) return false;

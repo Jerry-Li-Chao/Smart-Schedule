@@ -31,6 +31,8 @@ interface UI {
   planOpen: boolean;
   /** ⌘K search panel */
   search?: boolean;
+  /** the meaning-search index being built in the background */
+  searchIndex?: { state: 'off' | 'indexing' | 'ready' | 'error'; done: number; total: number; error?: string };
   toast?: Toast;
   syncing: boolean;
   jump?: { date: ISODate; n: number };

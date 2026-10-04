@@ -1282,3 +1282,7 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .sr-proj { background: var(--drop-bg); border-radius: 99px; padding: 0 8px; }
 .sp-foot { border-top: 1px solid var(--line); padding: 6px 14px; display: flex; gap: 4px; align-items: center; }
 .search-top { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); }
+.sr-related { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700; color: #7c3aed; background: color-mix(in srgb, #8b5cf6 12%, transparent); border-radius: 99px; padding: 0 7px; }
+.ix-bar { display: inline-block; width: 120px; height: 6px; margin-left: 8px; background: var(--drop-bg); border-radius: 3px; overflow: hidden; vertical-align: middle; }
+.ix-bar i { display: block; height: 100%; background: var(--accent); }
+.sp-input .spin { color: var(--accent); }
