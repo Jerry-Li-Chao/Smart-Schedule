@@ -174,6 +174,6 @@ fail, and find which step needs to change.
 
 ## What text search can't do
 
-Ask it for `visa paperwork` when the task says "I-20 signature", or `teeth` when it says
+Ask it for `car paperwork` when the task says "Renew vehicle registration", or `teeth` when it says
 "dentist". No letters in common, so no amount of forgiveness helps. That's what part 2 —
 **meaning search with embeddings** — is for.
