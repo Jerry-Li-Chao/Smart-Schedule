@@ -21,6 +21,7 @@ import { ProjectsView } from './components/Projects';
 import { HistoryView } from './components/HistoryView';
 import { Achievements } from './components/Achievements';
 import { Repeats } from './components/Repeats';
+import { ScriptBanner } from './components/ScriptBanner';
 import { SettingsView } from './components/Settings';
 import { ContextMenu } from './components/ItemCard';
 import { DeleteRepeatDialog } from './components/DeleteRepeatDialog';
@@ -179,6 +180,7 @@ function Shell() {
       )}
       <main className="main">
         <TopBar today={today} queueLen={queueLen} />
+        <ScriptBanner />
         <div className="content">
           {view === 'timeline' && (
             <div className="tl-layout">

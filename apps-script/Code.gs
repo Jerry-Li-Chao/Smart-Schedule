@@ -11,6 +11,12 @@
  * one is copied to _app_history. Two devices editing different tasks never collide.
  */
 
+/**
+ * Bump this whenever the script changes in a way the app relies on. The app compares it with the
+ * copy it ships with and asks you to update the deployed script when this one is older.
+ */
+var SCRIPT_VERSION = 2;
+
 var DATA_SHEET = '_app_data';
 var HIST_SHEET = '_app_history';
 var CAL_SHEET = 'Calendar (app)';
@@ -69,13 +75,19 @@ function api(reqJson) {
 }
 
 function api_(req) {
+  var res = handle_(req);
+  res.scriptVersion = SCRIPT_VERSION;
+  return res;
+}
+
+function handle_(req) {
   var token = PropertiesService.getScriptProperties().getProperty('TOKEN');
   if (!token) return { ok: false, error: 'Backend not set up yet: open Extensions → Apps Script and run setup().' };
   if (!req || req.token !== token) return { ok: false, error: 'Wrong sync token.' };
   try {
     switch (req.action) {
       case 'ping':
-        return { ok: true, spreadsheet: SpreadsheetApp.getActive().getName(), sheets: userSheets_(), linked: linked_() };
+        return { ok: true, spreadsheet: SpreadsheetApp.getActive().getName(), url: SpreadsheetApp.getActive().getUrl(), sheets: userSheets_(), linked: linked_() };
       case 'sync':
         return sync_(req);
       case 'legacy':

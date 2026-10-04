@@ -1,8 +1,18 @@
-import type { Entity } from '../types';
+import type { Entity, Settings } from '../types';
 import { S, useStore } from '../store';
 import { desk, inAppsScript } from './bridge';
 
 /** One call to the Apps Script backend, over whichever transport this platform has. */
+/** Remember which script version answered, and the spreadsheet's link when it tells us. */
+function noteScriptVersion(res: { scriptVersion?: unknown; url?: unknown }) {
+  if (inAppsScript() || !res || typeof res !== 'object') return;
+  const v = typeof res.scriptVersion === 'number' ? res.scriptVersion : 0;
+  const patch: Partial<Settings> = {};
+  if (S().settings.scriptVersion !== v) patch.scriptVersion = v;
+  if (typeof res.url === 'string' && res.url !== S().settings.sheetUrl) patch.sheetUrl = res.url;
+  if (Object.keys(patch).length) S().setSettings(patch);
+}
+
 export async function apiCall<T = Record<string, unknown>>(payload: Record<string, unknown>): Promise<T & { ok: boolean; error?: string }> {
   const { syncUrl, syncToken } = S().settings;
   const body = JSON.stringify({ ...payload, token: syncToken.trim() });
@@ -30,7 +40,9 @@ export async function apiCall<T = Record<string, unknown>>(payload: Record<strin
   }
   if (text.trimStart().startsWith('<'))
     throw new Error('The URL returned a web page instead of data. Make sure it ends in /exec and the deployment’s access is “Anyone”.');
-  return JSON.parse(text);
+  const res = JSON.parse(text);
+  noteScriptVersion(res);
+  return res;
 }
 
 export const syncConfigured = () => {

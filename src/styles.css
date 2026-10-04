@@ -1247,3 +1247,13 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .saved-copies { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 4px; }
 .sc-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
 .sc-kind { font-weight: 600; min-width: 170px; }
+.script-banner { display: flex; align-items: center; gap: 10px; padding: 8px 14px; font-size: 13px; background: color-mix(in srgb, #f59e0b 16%, var(--panel)); border-bottom: 1px solid color-mix(in srgb, #f59e0b 45%, transparent); color: var(--text); }
+.script-banner > svg { color: #b45309; flex-shrink: 0; }
+.script-banner span { flex: 1; }
+.script-status { margin-top: 8px; font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.script-status.old { color: #b45309; }
+.modal.guide.update-guide { display: flex; flex-direction: column; width: min(640px, calc(100vw - 32px)); }
+.update-guide .guide-body { padding: 14px 18px; }
+.upd-list { margin: 6px 0; padding-left: 18px; }
+.upd-steps { padding-left: 20px; display: flex; flex-direction: column; gap: 12px; }
+.upd-steps li > div { margin-top: 6px; }

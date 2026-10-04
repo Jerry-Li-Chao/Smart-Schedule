@@ -5,6 +5,7 @@ import { S, useStore } from '../store';
 import { apiCall } from '../lib/sync';
 import { cls } from '../lib/id';
 import { Field } from './ui';
+import { BUNDLED_SCRIPT_VERSION, missingChanges } from '../lib/scriptVersion';
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
@@ -107,6 +108,7 @@ export function SetupGuide({ onClose, onConnected }: { onClose: () => void; onCo
             </button>
           </div>
           {showCode && <pre className="code-preview">{codeGs}</pre>}
+          <p className="small muted">When a newer version of the app needs a newer script, it tells you with a banner and walks you through updating — it takes about two minutes.</p>
         </>
       ),
     },
@@ -229,6 +231,116 @@ export function SetupGuide({ onClose, onConnected }: { onClose: () => void; onCo
               Next <ChevronRight size={14} />
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Steps for replacing an outdated deployed script with the one this app ships with. */
+export function ScriptUpdateGuide({ onClose }: { onClose: () => void }) {
+  const settings = useStore((s) => s.settings);
+  const missing = missingChanges(settings.scriptVersion);
+  const [check, setCheck] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [onClose]);
+
+  const runCheck = async () => {
+    setChecking(true);
+    setCheck(null);
+    try {
+      const r = await apiCall<{ scriptVersion?: number }>({ action: 'ping' });
+      const v = r.scriptVersion ?? 0;
+      if (v >= BUNDLED_SCRIPT_VERSION) setCheck({ ok: true, msg: `Up to date — the Google Sheet now runs version ${v}.` });
+      else
+        setCheck({
+          ok: false,
+          msg: `Still the old script (version ${v || '1'}). Make sure you saved, then deployed a new version of the existing deployment (step 3).`,
+        });
+    } catch (e) {
+      setCheck({ ok: false, msg: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  return (
+    <div className="modal-bg" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal guide update-guide">
+        <div className="guide-head">
+          <b>Update your Google Sheet’s script</b>
+          <span className="muted small">about 2 minutes</span>
+          <span className="spacer" />
+          <button className="icon-btn" onClick={onClose}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="guide-body">
+          {missing.length > 0 && (
+            <div className="callout">
+              <b>
+                Your Google Sheet runs version {settings.scriptVersion || '1'}; this app comes with version {BUNDLED_SCRIPT_VERSION}.
+              </b>{' '}
+              Updating adds:
+              <ul className="upd-list">
+                {missing.map((m) => (
+                  <li key={m}>{m}</li>
+                ))}
+              </ul>
+              Your data, sync token and web-app URL all stay the same.
+            </div>
+          )}
+          <ol className="upd-steps">
+            <li>
+              <b>Open the script.</b> In your Google Sheet choose <Kbd>Extensions → Apps Script</Kbd>.
+              {settings.sheetUrl && (
+                <div>
+                  <a className="btn tiny" href={settings.sheetUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink size={12} /> Open {settings.sheetName ? `“${settings.sheetName}”` : 'your Google Sheet'}
+                  </a>
+                </div>
+              )}
+            </li>
+            <li>
+              <b>Replace the code.</b> Click into <code>Code.gs</code>, select everything (<Kbd>⌘A</Kbd>), paste the new script (<Kbd>⌘V</Kbd>) and save (
+              <Kbd>⌘S</Kbd>).
+              <div className="copy-row">
+                <CopyButton text={codeGs} label="Copy new script" />
+                <span className="muted small">version {BUNDLED_SCRIPT_VERSION}</span>
+              </div>
+            </li>
+            <li>
+              <b>Deploy it as a new version of the same deployment.</b> <Kbd>Deploy → Manage deployments</Kbd> → the ✏️ pencil on your existing deployment →{' '}
+              <b>Version:</b> <Kbd>New version</Kbd> → <Kbd>Deploy</Kbd>.
+              <div className="small muted">
+                Don’t use “New deployment” — that makes a new URL, and the app would still talk to the old one. You don’t need to run <code>setup</code> again.
+              </div>
+            </li>
+            <li>
+              <b>Check.</b>
+              <div className="inline gap">
+                <button className="btn primary" disabled={checking} onClick={runCheck}>
+                  {checking ? 'Checking…' : 'Check again'}
+                </button>
+                {check && (
+                  <span className={cls('small', check.ok ? 'ok-text' : 'err-text')}>
+                    {check.ok && <CheckCircle2 size={13} />} {check.msg}
+                  </span>
+                )}
+              </div>
+            </li>
+          </ol>
+        </div>
+        <div className="guide-foot">
+          <span className="spacer" />
+          <button className="btn primary" onClick={onClose}>
+            {check?.ok ? 'Done' : 'Close'}
+          </button>
         </div>
       </div>
     </div>

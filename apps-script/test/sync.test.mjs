@@ -53,6 +53,7 @@ function fakeGoogle() {
   }
   const ss = {
     getName: () => 'Test Spreadsheet',
+    getUrl: () => 'https://docs.google.com/spreadsheets/d/TEST/edit',
     getSpreadsheetTimeZone: () => 'Etc/UTC',
     getSheetByName: (n) => sheets.get(n) ?? null,
     insertSheet: (n) => { const s = makeSheet(n); sheets.set(n, s); return s; },
@@ -171,5 +172,12 @@ assert.ok(col(5).some(([v]) => v === 'Vehicle renewal'), 'the day\'s task is sti
 assert.equal(call({ action: 'unlink' }).ok, true);
 call({ action: 'sync', since: 0, device: 'Mac', changes: [task('t_l1', 'renamed after unlink', 6000, { date: '2026-10-01', time: '07:55' })] });
 assert.equal(legacy.data[1][2], '7:55AM Call the bank', 'unlinked tab no longer changes');
+
+// every response says which script version answered (so the app can ask for an update)
+const pong = call({ action: 'ping' });
+assert.equal(typeof pong.scriptVersion, 'number');
+assert.ok(pong.url, 'ping returns the spreadsheet URL');
+const src = (await import('node:fs')).readFileSync(new URL('../Code.gs', import.meta.url), 'utf8');
+assert.equal(pong.scriptVersion, Number(/var SCRIPT_VERSION = (\d+)/.exec(src)[1]));
 
 console.log('apps-script sync: all scenarios passed');

@@ -10,6 +10,7 @@ import { readXlsx } from '../lib/xlsxImport';
 import { cls } from '../lib/id';
 import { Field, Segmented } from './ui';
 import { SetupGuide } from './SetupGuide';
+import { ScriptStatus } from './ScriptBanner';
 
 function ago(ms?: number) {
   if (!ms) return 'never';
@@ -90,6 +91,7 @@ export function SheetSync() {
           )}
           {err && <span className="err-text small">{err}</span>}
         </div>
+        <ScriptStatus />
       </section>
 
       {guide && <SetupGuide onClose={() => setGuide(false)} onConnected={(spreadsheet, sheets) => setPing({ spreadsheet, sheets, linked: null })} />}

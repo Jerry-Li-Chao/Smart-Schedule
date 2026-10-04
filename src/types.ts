@@ -129,6 +129,10 @@ export interface Settings {
   llmModel: string;
   /** Short context sent with every AI question, e.g. where the user lives */
   llmAbout?: string;
+  /** SCRIPT_VERSION the connected Google Sheet's script last answered with (0 = too old to say) */
+  scriptVersion?: number;
+  /** link to the connected spreadsheet (from the script), for "open your Google Sheet" */
+  sheetUrl?: string;
   /** name of the connected spreadsheet, remembered for labels */
   sheetName?: string;
   /** ISO 4217 code used to show costs, e.g. USD */
