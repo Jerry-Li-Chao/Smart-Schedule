@@ -144,6 +144,7 @@ canvas { width: 100%; max-width: 420px; aspect-ratio: 1; border-radius: 12px; ba
   <p class="small muted"><b>Why we need it.</b> Step 2 only finds terms that are spelled <i>exactly</i> right. Type <code>pasport</code> and step 1 turns it into the term <code>pasport</code> — which no task contains, so the lookup finds nothing. To forgive typos, the search compares your term with the terms in the index and keeps those that are only one or two letters off. “How many letters off” is the <b>edit distance</b>: the fewest single-letter changes — insert one, delete one, replace one, or swap two neighbours — that turn one word into the other.</p>
   <div class="small" id="edNear" style="margin:6px 0 10px"></div>
   <div class="row"><span class="small">Compare</span><input type="text" id="edA" value="pasport" style="max-width:180px" /><span class="small">with</span><input type="text" id="edB" value="passport" style="max-width:180px" /><span id="edOut" class="kpi"></span></div>
+  <div class="row small" style="margin-top:6px">Examples: <button class="ex edEx" data-a="pasport" data-b="passport">insert: pasport</button><button class="ex edEx" data-a="passsport" data-b="passport">delete: passsport</button><button class="ex edEx" data-a="passpart" data-b="passport">replace: passpart</button><button class="ex edEx" data-a="passprot" data-b="passport">swap: passprot</button><button class="ex edEx" data-a="pasprot" data-b="passport">two typos: pasprot</button></div>
   <div class="small" id="edSteps" style="margin:6px 0"></div>
   <div class="grid2" style="align-items:start">
     <div style="overflow:auto"><table class="dp" id="dp"></table><div class="small muted" style="margin-top:6px"><span style="outline:2px solid var(--accent);outline-offset:-2px;padding:0 4px">blue outline</span> = the cell you're pointing at · <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange outline</span> = the cell its value came from · <span style="background:var(--accent-soft);padding:0 4px">blue fill</span> = the path to the answer</div></div>
@@ -171,12 +172,19 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
 <div class="card">
   <div class="try">Step 4 · Search the sample planner</div>
   <h3>Scoring: what each match is worth</h3>
-  <p class="small muted">Each query word expands to index terms it could mean — <span class="chip ok">exact ×1</span> <span class="chip">word start ×0.75</span> <span class="chip amber">typo ×0.6</span>. A match earns <b>factor × IDF × field weight</b>; rare words (high IDF) count more. Results matching more of the query come first. Phrases like “last month”, “done” or “bills” become filters.</p>
-  <input type="text" id="qIn" value="pasport" />
-  <div class="row small" style="margin-top:6px">Try: <button class="ex" data-q="pass">pass</button><button class="ex" data-q="renewing">renewing</button><button class="ex" data-q="dentst cleaning">dentst cleaning</button><button class="ex" data-q="done last month">done last month</button><button class="ex" data-q="bills">bills</button><button class="ex" data-q="牙医">牙医</button><button class="ex" data-q="teeth">teeth</button></div>
+  <p class="small muted">Each query word expands to index terms it could mean — <span class="chip ok">exact ×1</span> <span class="chip">word start ×0.75</span> <span class="chip amber">typo ×0.6</span>. A match earns <b>factor × IDF × field weight</b> (field weight from step 2: title 3, project/repeat 1.5, notes 1). Results matching more of the query come first. Phrases like “last month”, “done” or “bills” become filters.</p>
+  <div class="small" style="margin:8px 0;padding:8px 10px;background:var(--bg);border-radius:6px">
+    <b>IDF — “how rare is this word?”</b> Short for <i>inverse document frequency</i>. A word that appears in almost every task (like “call” or “pay”) tells you little about which task you mean; a word in only one task (like “passport”) points straight at it. So each term gets a rarity score:
+    <div class="mono" style="margin:6px 0">IDF = ln(1 + N / n)   &nbsp;N = number of tasks, n = tasks containing the term</div>
+    <span id="idfEx"></span> The rarer the word, the bigger its share of the score. (The “1 +” keeps it above zero even for a word in every task.)
+    <div id="qIdf" style="margin-top:6px"></div>
+  </div>
+  <input type="text" id="qIn" value="call dentist cleaning" />
+  <div class="row small" style="margin-top:6px">Try: <button class="ex" data-q="call dentist cleaning">call dentist cleaning</button><button class="ex" data-q="dentist">dentist</button><button class="ex" data-q="kitchen">kitchen</button><button class="ex" data-q="dentst">dentst</button><button class="ex" data-q="pasport">pasport</button><button class="ex" data-q="renewing">renewing</button><button class="ex" data-q="done last month">done last month</button><button class="ex" data-q="bills">bills</button><button class="ex" data-q="牙医">牙医</button><button class="ex" data-q="teeth">teeth</button></div>
   <div class="chips" id="qFilters"></div>
   <div id="qExpand" class="small"></div>
-  <table style="margin-top:8px"><thead><tr><th>result</th><th>why</th><th class="num">coverage</th><th class="num">score</th></tr></thead><tbody id="qRes"></tbody></table>
+  <table style="margin-top:8px"><thead><tr><th class="num">#</th><th>result</th><th>points earned per query word</th><th class="num">coverage</th><th class="num">score</th></tr></thead><tbody id="qRes"></tbody></table>
+  <div class="small" id="qWhy" style="margin-top:8px"></div>
   <div class="note" id="qNote"></div>
 </div>
 
@@ -312,6 +320,8 @@ let DOCS = [
   { id: 10, title: '看牙医', notes: '', ctx: '', date: '2026-08-20', done: true },
   { id: 11, title: 'Book flights to Tokyo', notes: '', ctx: '', date: '2026-10-10', done: false },
   { id: 12, title: 'Gym membership', notes: '', ctx: 'every month on the 3rd · bill subscription', date: '2026-01-03', done: false, repeat: true },
+  { id: 14, title: 'Choose kitchen tiles', notes: '', ctx: 'Kitchen renovation', date: '2026-10-12', done: false },
+  { id: 15, title: 'Pick up prescription', notes: 'ask the dentist about the dose', ctx: '', date: '2026-10-04', done: false },
 ];
 
 // ===================================================================== part 1: the same logic as src/lib/search/text.ts
@@ -397,14 +407,15 @@ function search(idx, text, f) {
       score.set(i, (score.get(i) ?? 0) + b.v * (qt.bonus ? 0.5 : 1));
       if (!qt.bonus) hits.set(i, (hits.get(i) ?? 0) + 1);
       if (!why.has(i)) why.set(i, []);
-      why.get(i).push(`<span class="mono">${esc(qt.t)}</span>→<span class="mono">${esc(b.term)}</span> ${b.kind} ${b.factor}×IDF ${b.idf.toFixed(2)}×w${b.w} = <b>${b.v.toFixed(2)}</b>`);
+      why.get(i).push(`<span class="mono">${esc(qt.t)}</span>→<span class="mono">${esc(b.term)}</span> ${b.kind} ${b.factor} × IDF ${b.idf.toFixed(2)} × ${FIELD_NAME[b.w]} ${b.w} = <b>${b.v.toFixed(2)}</b>`);
     }
   }
   const need = words.length <= 2 ? words.length : Math.ceil(words.length * 0.6);
   const rows = [];
-  for (const [i, s] of score) { const d = idx.docs[i]; const h = hits.get(i) ?? 0; if (h < need || !passes(d, f)) continue; rows.push({ d, score: s, cov: words.length ? h / words.length : 1, why: why.get(i) }); }
+  const out = [];
+  for (const [i, s] of score) { const d = idx.docs[i]; const h = hits.get(i) ?? 0; const r = { d, score: s, hits: h, cov: words.length ? h / words.length : 1, why: why.get(i) }; if (!passes(d, f)) continue; (h < need ? out : rows).push(r); }
   rows.sort((a, b) => b.cov - a.cov || b.score - a.score);
-  return { rows, exps };
+  return { rows, exps, out, need, nWords: words.length };
 }
 function highlight(text, terms) {
   const low = normalize(text); if (low.length !== text.length) return esc(text);
@@ -529,26 +540,43 @@ function explainCell(r, c) {
       [`<b>Move down</b> from the cell ${q(A1 || '—')} → ${q(B || '—')}. ${q(A)} is ${q(A1 || '')} + “${la}”. ${done(r - 1, c).replace('First turn', 'First turn its')} The first word now reads ${q(B)} + the untouched “${la}” = ${q(B + la)} — one letter too many. Delete the “${la}” to get ${q(B)} — one more edit: ${D[r - 1][c]} + 1`, D[r - 1][c] + 1, [r - 1, c]],
       [`<b>Move right</b> from the cell ${q(A || '—')} → ${q(B1 || '—')}. ${done(r, c - 1).replace('First turn', 'First turn the whole first word')} The first word now reads ${q(B1)} — one letter short of ${q(B)}. Insert “${lb}” at the end to get ${q(B)} — one more edit: ${D[r][c - 1]} + 1`, D[r][c - 1] + 1, [r, c - 1]],
     ];
-    if (r > 1 && c > 1 && a[r - 1] === b[c - 2] && a[r - 2] === b[c - 1]) opts.push([`<b>Swap</b> from the cell ${q(a.slice(0, r - 2) || '—')} → ${q(b.slice(0, c - 2) || '—')}. ${done(r - 2, c - 2)} The word now ends in “${a[r - 2]}${a[r - 1]}”; swap the two letters to get ${q(B)} — one more edit: ${D[r - 2][c - 2]} + 1`, D[r - 2][c - 2] + 1, [r - 2, c - 2]]);
+    if (r > 1 && c > 1 && a[r - 1] === b[c - 2] && a[r - 2] === b[c - 1]) opts.push([`<b>Swap</b> from the cell ${q(a.slice(0, r - 2) || '—')} → ${q(b.slice(0, c - 2) || '—')}. ${q(A)} is ${q(a.slice(0, r - 2) || '')} + “${a[r - 2]}${a[r - 1]}”. ${done(r - 2, c - 2).replace('First turn', 'First turn its')} The first word now reads ${q(b.slice(0, c - 2))} + the untouched “${a[r - 2]}${a[r - 1]}” = ${q(b.slice(0, c - 2) + a[r - 2] + a[r - 1])}. Swap those two letters to get ${q(B)} — one more edit: ${D[r - 2][c - 2]} + 1`, D[r - 2][c - 2] + 1, [r - 2, c - 2]]);
     const best = opts.find(([, x]) => x === v);
     document.querySelectorAll('#dp td.src').forEach((x) => x.classList.remove('src'));
     document.querySelector(`#dp td[data-r="${best[2][0]}"][data-c="${best[2][1]}"]`)?.classList.add('src');
-    how = `Every edit adds 1 to the count. Three ways to reach this cell — the <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange-outlined</span> cell in the table is where the cheapest way starts:<ol style="margin:4px 0;padding-left:18px">` + opts.map(([t, x]) => `<li style="margin-bottom:4px">${x === v ? `<b>${t} = ${x}</b> ✓` : `<span class="muted">${t} = ${x}</span>`}</li>`).join('') + '</ol>';
+    how = `Every edit adds 1 to the count. ${opts.length === 4 ? 'Four ways (including a swap)' : 'Three ways'} to reach this cell — the <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange-outlined</span> cell in the table is where the cheapest way starts:<ol style="margin:4px 0;padding-left:18px">` + opts.map(([t, x]) => `<li style="margin-bottom:4px">${x === v ? `<b>${t} = ${x}</b> ✓` : `<span class="muted">${t} = ${x}</span>`}</li>`).join('') + '</ol>';
   }
   $('edCell').innerHTML = `<b>Cell: “${esc(A || '—')}” → “${esc(B || '—')}” = ${v}</b><br>${v} edit${v === 1 ? ' turns' : 's turn'} “${esc(A)}” into “${esc(B)}”.<br><br>${how}${r === a.length && c === b.length ? '<br><br>This is the bottom-right cell: whole word vs whole word — the answer.' : ''}`;
 }
 $('edA').oninput = $('edB').oninput = renderDp;
+document.querySelectorAll('.edEx').forEach((b) => (b.onclick = () => { $('edA').value = b.dataset.a; $('edB').value = b.dataset.b; renderDp(); }));
 
 // ---- step 4: search lab
 function renderSearch() {
   const { text, f } = parseQuery($('qIn').value);
   const fchips = [f.label, f.status, f.bills && 'bills'].filter(Boolean);
   $('qFilters').innerHTML = fchips.length ? `<span class="small muted">filters:</span>` + fchips.map((c) => `<span class="chip ok">${esc(c)}</span>`).join('') + (text ? ` <span class="small muted">text left: “${esc(text)}”</span>` : '') : '';
-  const { rows, exps } = search(IDX, text, f);
+  const { rows, exps, out, need, nWords } = search(IDX, text, f);
+  const N = IDX.docs.length, seen = [...new Set(exps.flatMap(([, ex]) => ex.map(([t]) => t)))];
+  $('idfEx').textContent = `With the ${N} sample tasks: a term in 1 task → ln(1 + ${N}/1) ≈ ${Math.log(1 + N).toFixed(2)}; in 3 tasks → ln(1 + ${N}/3) ≈ ${Math.log(1 + N / 3).toFixed(2)}.`;
+  $('qIdf').innerHTML = seen.length ? 'Live, for this search: ' + seen.map((t) => { const n = IDX.postings.get(t).size; return `<span class="chip">${esc(t)}</span> in ${n} of ${N} task${N > 1 ? 's' : ''} → IDF ln(1 + ${N}/${n}) = <b>${Math.log(1 + N / n).toFixed(2)}</b>`; }).join(' · ') : '';
   $('qExpand').innerHTML = exps.map(([qt, ex]) => `<div><span class="chip ${qt.bonus ? 'bonus' : ''}">${esc(qt.t)}</span> → ${ex.length ? ex.map(([t, fa, k]) => `<span class="chip ${k === 'exact' ? 'ok' : k === 'typo' ? 'amber' : ''}">${esc(t)} ×${fa}</span>`).join(' ') : '<span class="muted">nothing in the index</span>'}</div>`).join('');
   const terms = exps.flatMap(([, ex]) => ex.map(([t]) => t));
-  $('qRes').innerHTML = rows.length ? rows.map((r) => `<tr><td>${highlight(r.d.title, terms)}</td><td class="small">${r.why.join('<br>')}</td><td class="num">${Math.round(r.cov * 100)}%</td><td class="num">${r.score.toFixed(2)}</td></tr>`).join('') : `<tr><td colspan="4" class="muted">No text match.</td></tr>`;
-  $('qNote').innerHTML = /teeth/i.test(text) && !rows.length ? 'No letters in common with “dentist” — text search can’t help. That’s what part 2 is for.' : 'Coverage first (how many query words matched), then score. Short queries must match every word.';
+  $('qRes').innerHTML = rows.length ? rows.map((r, k) => `<tr><td class="num"><b>${k + 1}</b></td><td>${highlight(r.d.title, terms)}${r.d.notes ? `<div class="small muted">notes: ${highlight(r.d.notes, terms)}</div>` : ''}${r.d.ctx ? `<div class="small muted">${esc(r.d.ctx)}</div>` : ''}</td><td class="small">${r.why.join('<br>')}</td><td class="num">${r.hits}/${nWords} = ${Math.round(r.cov * 100)}%</td><td class="num">${r.score.toFixed(2)}</td></tr>`).join('') : `<tr><td colspan="5" class="muted">No text match.</td></tr>`;
+  // why this order, in words
+  const lines = [];
+  if (nWords) lines.push(`<b>How the order is decided.</b> 1) <b>Coverage</b> first: ${nWords > 1 ? `how many of your ${nWords} words the task matched.` : 'does the task contain your word?'} ${nWords <= 2 ? `${nWords > 1 ? 'A 2-word query must match both.' : 'With one word, every result matches it — so here only the score decides.'}` : `A longer query needs 60% of its words — here ${need} of ${nWords} — so one typo or extra word doesn't hide everything.`} 2) Then <b>score</b>: the points from the table added up.`);
+  const reason = (x, y) => {
+    if (x.cov !== y.cov) return `more of your words (${Math.round(x.cov * 100)}% vs ${Math.round(y.cov * 100)}%) — coverage beats score${x.score < y.score ? `, even though its score is lower (${x.score.toFixed(2)} vs ${y.score.toFixed(2)})` : ''}`;
+    if (Math.abs(x.score - y.score) < 0.005) return 'a tie — same word, same place (title), so either order is fine';
+    const wx = x.why.join(' '), wy = y.why.join(' ');
+    const hint = /title 3/.test(wx) && !/title 3/.test(wy) ? ' — its match is in the title (×3), the other only in the project or notes' : /typo/.test(wy) && !/typo/.test(wx) ? ' — an exact match (×1) beats a typo match (×0.6)' : /title 3/.test(wx) && /notes 1|project\/repeat 1.5/.test(wy) ? ' — more of its matches are in the title' : ' — its words are rarer (higher IDF) or in better places';
+    return `same coverage, higher score (${x.score.toFixed(2)} vs ${y.score.toFixed(2)})${hint}`;
+  };
+  for (let k = 0; k + 1 < rows.length; k++) lines.push(`#${k + 1} “${esc(rows[k].d.title)}” is above #${k + 2} “${esc(rows[k + 1].d.title)}”: ${reason(rows[k], rows[k + 1])}.`);
+  for (const r of out) lines.push(`<span class="muted">Left out: “${esc(r.d.title)}” — matched only ${r.hits} of ${nWords} words, needs ${need}.</span>`);
+  $('qWhy').innerHTML = lines.map((x) => `<div style="margin-bottom:4px">${x}</div>`).join('');
+  $('qNote').innerHTML = /teeth/i.test(text) && !rows.length ? 'No letters in common with “dentist” — text search can’t help. That’s what part 2 is for.' : '';
 }
 $('qIn').oninput = renderSearch;
 document.querySelectorAll('.ex[data-q]').forEach((b) => (b.onclick = () => { $('qIn').value = b.dataset.q; renderSearch(); }));
