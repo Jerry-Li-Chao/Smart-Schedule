@@ -19,4 +19,5 @@ planner-*.json
 *.xls
 *.csv
 __test*
-before-switch-*.json
+before-import-*.json
+before-clear-*.json

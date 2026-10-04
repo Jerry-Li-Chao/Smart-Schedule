@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, FolderOpen, History, Upload } from 'lucide-react';
+import { Download, Eraser, FolderOpen, History, Upload } from 'lucide-react';
 import type { Importance } from '../types';
 import { ask, listModels } from '../lib/llm';
 import { S, useStore } from '../store';
@@ -7,7 +7,7 @@ import { addDays, fmtDay, todayISO } from '../lib/date';
 import { desk } from '../lib/bridge';
 import { BlurInput, Field } from './ui';
 import { buildExport, download, exportFileName, parsePlannerFile, type PlannerFile } from '../lib/transfer';
-import { ImportPlanner } from './ImportPlanner';
+import { ClearPlanner, ImportPlanner } from './ImportPlanner';
 import { SheetSync } from './SheetSync';
 import { DEFAULT_ALERT_LEVELS } from './AlertsDock';
 import { cls } from '../lib/id';
@@ -73,11 +73,19 @@ export function SettingsView() {
       </section>
 
       <section>
-        <h2>Backups &amp; history</h2>
-        <p className="muted small">
-          {desk ? 'The desktop app also writes a dated copy of everything to disk once a day (last 60 days kept). ' : ''}
-        </p>
+        <h2>Your planner: export, import, start fresh</h2>
+        <div className="terms">
+          <div>
+            <b>Planner</b> — everything in this app: tasks, sticky notes, repeats, bills, projects, all-day events, history and preferences. It lives on this
+            computer.
+          </div>
+          <div>
+            <b>Google Sheet</b> — an optional spreadsheet in your Google Drive where the planner keeps a synced copy (for backup and your phone). One planner
+            syncs with at most one Google Sheet; set it up in the Google Sheet section above.
+          </div>
+        </div>
         <Transfer />
+        <p className="muted small">{desk ? 'The desktop app also saves a dated copy of the planner to disk once a day (the last 60 days are kept).' : ''}</p>
         <div className="inline gap" style={{ marginTop: 10 }}>
           <button className="btn" onClick={() => S().setUI({ view: 'history' })}>
             <History size={14} /> History &amp; trash
@@ -132,6 +140,7 @@ function Transfer() {
   const sheetName = useStore((s) => s.settings.sheetName);
   const [withSheet, setWithSheet] = useState(true);
   const [file, setFile] = useState<PlannerFile | null>(null);
+  const [clearing, setClearing] = useState(false);
   const exportNow = () => {
     download(exportFileName(), JSON.stringify(buildExport({ includeSheet: connected && withSheet }), null, 1));
     S().toast('Planner exported');
@@ -153,18 +162,23 @@ function Transfer() {
           <Upload size={14} /> Import planner…
           <input type="file" accept="application/json,.json" hidden onChange={(e) => (e.target.files?.[0] && pick(e.target.files[0]), (e.target.value = ''))} />
         </label>
+        <button className="btn danger" onClick={() => setClearing(true)}>
+          <Eraser size={14} /> Clear planner…
+        </button>
       </div>
       {connected && (
         <label className="check-row small" style={{ marginTop: 8 }}>
           <input type="checkbox" checked={withSheet} onChange={(e) => setWithSheet(e.target.checked)} />
-          Include the Google Sheet connection{sheetName ? ` (“${sheetName}”)` : ''}, so importing the file reconnects to it — the file then works like a password, keep it private
+          Also save which Google Sheet it syncs with{sheetName ? ` (“${sheetName}”)` : ''}, so importing the file reconnects to it. The file then works like a
+          password — keep it private.
         </label>
       )}
       <p className="muted small">
-        One file with every task, repeat, bill, project and event, plus your preferences. Use it to keep a copy or to switch between planners — importing asks whether
-        to switch or add, and what should happen to the Google Sheet.
+        <b>Export</b> saves the whole planner as one file. <b>Import</b> opens a planner file and asks whether to replace this planner or add to it.{' '}
+        <b>Clear</b> empties this planner (a copy is saved first) — export, clear, then import to get everything back exactly as it was.
       </p>
       {file && <ImportPlanner file={file} onClose={() => setFile(null)} />}
+      {clearing && <ClearPlanner onClose={() => setClearing(false)} />}
     </>
   );
 }

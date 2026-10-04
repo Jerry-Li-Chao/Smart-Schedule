@@ -1240,3 +1240,4 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .imp-sheet .check-row { display: flex; gap: 8px; align-items: flex-start; }
 .imp-sheet .check-row input { margin-top: 2px; }
 .warn-opt b, .confirm-upload { color: var(--must); }
+.terms { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; line-height: 1.45; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 6px 0 12px; }
