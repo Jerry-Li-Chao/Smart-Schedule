@@ -122,8 +122,14 @@ texts:
 | unrelated | median 0.44, 97th percentile 0.55 |
 | vague queries (`something about my car`) vs unrelated titles | up to ~0.61 |
 
-So we keep matches ≥ **0.60**, and also drop anything more than 0.12 below the best match — once
-there's a strong match, weak ones are just noise. These numbers are model-specific: a different
+So we keep matches ≥ **0.60**.
+
+An early version also dropped anything more than 0.12 below the *best* match, reasoning that once
+there's a strong match, weak ones are noise. Real data proved that wrong: searching `跟朋友吃饭`
+(dinner with a friend), a near-duplicate task scored 0.90, which pushed the cut-off to 0.78 and
+threw away another dinner task at 0.70 — a perfectly good match. With many similar tasks, a
+relative cut-off removes exactly the results you wanted; the absolute floor plus a result limit is
+enough. These numbers are model-specific: a different
 model needs its own measurement. The way these were found is simple and worth copying: embed ~10
 tasks and ~10 queries whose right answers you know, print every similarity, and look at where the
 related pairs and the unrelated pairs fall.

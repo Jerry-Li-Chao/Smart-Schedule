@@ -161,10 +161,11 @@ export interface VecHit {
 /**
  * Cut-offs measured on bge-m3 with short task texts: related pairs scored 0.63+, unrelated ones
  * mostly below 0.56 (median 0.44; vague queries like "something about my car" reach ~0.61).
- * Anything well below the best match is dropped too.
+ *
+ * (There used to be a second rule — drop anything 0.12 below the best match — but with many
+ * similar tasks it threw away good ones: "跟朋友吃饭" scored 0.70 against a 0.90 near-duplicate.)
  */
 export const MIN_SIM = 0.6;
-const BELOW_BEST = 0.12;
 
 /** Embed the query and compare it with every document's vector: brute force is plenty for thousands. */
 export async function searchVectors(query: string, docs: SearchDoc[], limit = 30): Promise<VecHit[]> {
@@ -178,7 +179,5 @@ export async function searchVectors(query: string, docs: SearchDoc[], limit = 30
     const sim = dot(q, s.vec);
     if (sim >= MIN_SIM) out.push({ doc: d, sim });
   }
-  out.sort((a, b) => b.sim - a.sim);
-  const floor = (out[0]?.sim ?? 0) - BELOW_BEST;
-  return out.filter((h) => h.sim >= floor).slice(0, limit);
+  return out.sort((a, b) => b.sim - a.sim).slice(0, limit);
 }
