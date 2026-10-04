@@ -84,8 +84,32 @@ Repeating:
 [4] Pay rent — every month on the 1st — $1850 — next Sun Nov 1 2026 (in 29 days)
 ```
 
-Now "last" is the first line under *Past* and "next" is the first under *Today and later*. Same
-model, same question: right answer, every run. Other preparation choices:
+That looked like the fix — but re-measuring later with the app's *exact* instructions (8 runs per
+layout) showed otherwise: with a single unrelated item ("Back up laptop") at the top of *Past*, the
+grouped layout was wrong 8 times out of 8. The earlier "success" had depended on small wording
+differences in the prompt. Lesson one: **always re-measure with the exact prompt you ship.**
+
+Lesson two, the robust fix: **don't ask the model to reason where code can.** For "last …" and
+"next …" questions, the code picks the answer candidates itself — the most recent past match and
+the soonest upcoming one among the 5 most relevant results — and states them first:
+
+```
+Best matches for the question (worked out from the list below):
+- Most recent past: [2] Call the dentist — Sun Sep 13 2026 (20 days ago)
+
+Items:
+Past (newest first):
+[1] Back up laptop — Fri Oct 2 2026 (yesterday) — done
+[2] Call the dentist — Sun Sep 13 2026 (20 days ago) — done
+…
+```
+
+Right 8 times out of 8. One known weak spot remains: asked `上次看牙医是什么时候？` with a task
+literally titled `看牙医` (older) and a newer "Call the dentist about the cleaning", the model keeps
+choosing the literal title. Exact wording pulls small models hard — which is why every answer cites
+its items, so you can check.
+
+Other preparation choices:
 
 - Relative dates (`in 2 days`, `3 days overdue`) are computed in code.
 - Repeats get their **next** date and **last done** date computed from the repeat rule.

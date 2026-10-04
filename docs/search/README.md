@@ -1,5 +1,9 @@
 # How ⌘K search works
 
+**Start here: [the interactive tutorial](tutorial.html)** — open it in a browser; with Ollama running it uses your real models.
+
+The same material as text:
+
 Three layers, each a short tutorial for people who know programming but haven't built search or
 used embeddings and LLMs before:
 

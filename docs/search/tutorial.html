@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How Search Works</title>
+<style>
+:root {
+  --bg: #f6f5f1; --panel: #fff; --line: #e4e1d9; --text: #1f1e1b; --muted: #85817a; --accent: #2f6fed; --accent-soft: #e7eeff;
+  --must: #e5484d; --ok: #2f9e44; --ok-soft: #dcf3d6; --purple: #7c3aed; --purple-soft: #f1eafe; --amber: #b45309; --amber-soft: #fff4e0;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #17171a; --panel: #212125; --line: #34343a; --text: #ececea; --muted: #9a978f; --accent: #6d9bff; --accent-soft: #23304a;
+    --ok-soft: #1f3a24; --purple: #b794ff; --purple-soft: #2d2440; --amber: #f5b14c; --amber-soft: #3a2d17; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+header { padding: 28px 16px 10px; max-width: 980px; margin: 0 auto; }
+h1 { font-size: 30px; margin: 0 0 4px; letter-spacing: -0.02em; }
+h2 { font-size: 24px; margin: 40px 0 6px; letter-spacing: -0.01em; }
+h3 { font-size: 16px; margin: 0 0 6px; }
+p { margin: 6px 0; }
+nav { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+nav .in { max-width: 980px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+nav a { text-decoration: none; color: var(--text); font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); }
+nav a.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+nav .ollama { margin-left: auto; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.dot.on { background: var(--ok); }
+main { max-width: 980px; margin: 0 auto; padding: 0 16px 80px; }
+.part-tag { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); margin-top: 48px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin: 14px 0; }
+.lede { color: var(--muted); }
+.try { font-size: 11px; font-weight: 800; color: var(--purple); text-transform: uppercase; letter-spacing: .08em; }
+input[type=text], select { font: inherit; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; }
+input[type=range] { width: 100%; }
+button { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0; }
+.chip { font: 12.5px var(--mono); padding: 2px 8px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); }
+.chip.bonus { background: var(--purple-soft); color: var(--purple); }
+.chip.muted { background: var(--bg); color: var(--muted); border: 1px dashed var(--line); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.amber { background: var(--amber-soft); color: var(--amber); }
+.small { font-size: 12.5px; } .muted { color: var(--muted); } .mono { font-family: var(--mono); }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.num { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+mark { background: color-mix(in srgb, #facc15 50%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.dp { font: 12px var(--mono); border-collapse: collapse; margin-top: 8px; }
+.dp td, .dp th { width: 30px; height: 26px; text-align: center; border: 1px solid var(--line); padding: 0; }
+.dp th { background: var(--bg); color: var(--muted); text-transform: none; }
+.dp td.path { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.dp td.final { background: var(--accent); color: #fff; }
+.bar { height: 18px; border-radius: 4px; background: var(--accent); min-width: 2px; }
+.bar.related { background: var(--purple); }
+.bar.below { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.barrow { display: grid; grid-template-columns: minmax(130px, 220px) 1fr 52px; gap: 8px; align-items: center; font-size: 13px; margin: 3px 0; }
+.barwrap { position: relative; height: 18px; background: var(--bg); border-radius: 4px; }
+.cutline { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--must); }
+.term-list { max-height: 260px; overflow: auto; }
+.term { cursor: pointer; }
+.term:hover td, .term.on td { background: var(--accent-soft); }
+.doc { padding: 3px 8px; border-radius: 6px; font-size: 13px; }
+.doc.on { background: var(--accent-soft); }
+pre { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 12.5px/1.55 var(--mono); white-space: pre-wrap; margin: 8px 0; }
+.answer { background: var(--purple-soft); border-radius: 10px; padding: 10px 12px; margin-top: 8px; min-height: 44px; }
+.answer.bad { background: color-mix(in srgb, var(--must) 12%, var(--panel)); }
+.answer.good { background: var(--ok-soft); }
+.cite { display: inline-block; background: var(--purple); color: #fff; border-radius: 5px; padding: 0 5px; font-size: 11px; font-weight: 700; }
+.tag { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+.tag.yes { background: var(--ok-soft); color: var(--ok); } .tag.no { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+canvas { width: 100%; max-width: 420px; aspect-ratio: 1; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); touch-action: none; cursor: grab; }
+.kpi { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.note { border-left: 3px solid var(--accent); padding: 4px 12px; margin: 10px 0; color: var(--muted); font-size: 13.5px; }
+.flow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; margin: 8px 0; }
+.flow span { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; }
+.flow b { color: var(--muted); }
+.chunk { display: inline-block; font: 11.5px var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; margin: 3px; white-space: pre; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.chunk.new { border-color: var(--accent); }
+.fp { font-family: var(--mono); font-size: 12px; }
+.changed td { background: var(--amber-soft); }
+</style>
+</head>
+<body>
+<header>
+  <h1>How the planner’s search works</h1>
+  <p class="lede">An interactive walk through the three layers behind ⌘K — text search, search by meaning, and Ask. Everything on this page runs the same logic as the app; play with every box. With Ollama running, the embedding and LLM parts use your real models.</p>
+</header>
+<nav><div class="in">
+  <a href="#p1" data-part="p1">1 · Text search</a>
+  <a href="#p2" data-part="p2">2 · Meaning</a>
+  <a href="#p3" data-part="p3">3 · Ask</a>
+  <span class="ollama"><span class="dot" id="odot"></span><span id="ostat">checking Ollama…</span></span>
+</div></nav>
+<main>
+
+<!-- ========================== PART 1 ========================== -->
+<div class="part-tag" id="p1">Part 1</div>
+<h2>Text search — fast and forgiving</h2>
+<p class="lede">No AI. The goal: find <i>Renew passport</i> when you type <code>pasport</code>, <code>pass</code> or <code>renewing</code>, in about a millisecond.</p>
+
+<div class="card">
+  <div class="try">Step 1 · Try it</div>
+  <h3>Text → terms (tokenizing)</h3>
+  <p class="small muted">Lower-case, strip accents, split into words, chop common endings (“stemming”). Chinese has no spaces, so it becomes single characters <span class="chip bonus">+ pairs</span> of neighbours.</p>
+  <input type="text" id="tokIn" value="Renewals for 2 passports · 看牙医 Café" />
+  <div class="chips" id="tokOut"></div>
+  <div class="small muted" id="tokNote"></div>
+</div>
+
+<div class="card">
+  <div class="try">Step 2 · Click a term</div>
+  <h3>The inverted index</h3>
+  <p class="small muted">Instead of scanning every task per search, build a map <b>term → tasks containing it</b>, once. The number is the field weight: title 3, project/repeat 1.5, notes 1. Add a task and watch the index update.</p>
+  <div class="grid2">
+    <div>
+      <div class="small muted" style="margin-bottom:4px">Sample planner</div>
+      <div id="docList"></div>
+      <div class="row" style="margin-top:8px"><input type="text" id="addIn" placeholder="Add a task, e.g. Pay the electricity bill" /><button id="addBtn">Add</button></div>
+    </div>
+    <div class="term-list"><table><thead><tr><th>term</th><th>tasks (weight)</th><th class="num">IDF</th></tr></thead><tbody id="idxBody"></tbody></table></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="try">Step 3 · Edit the words</div>
+  <h3>Typos: edit distance</h3>
+  <p class="small muted">The minimum number of single-letter inserts, deletes, replacements (or swaps of neighbours) to turn one word into the other. Each cell = best cost so far; the bottom-right cell is the answer. Words of 4–6 letters may have 1 typo, 7+ letters 2.</p>
+  <div class="row"><input type="text" id="edA" value="pasport" style="max-width:200px" /><input type="text" id="edB" value="passport" style="max-width:200px" /><span id="edOut" class="kpi"></span></div>
+  <div style="overflow:auto"><table class="dp" id="dp"></table></div>
+</div>
+
+<div class="card">
+  <div class="try">Step 4 · Search the sample planner</div>
+  <h3>Scoring: what each match is worth</h3>
+  <p class="small muted">Each query word expands to index terms it could mean — <span class="chip ok">exact ×1</span> <span class="chip">word start ×0.75</span> <span class="chip amber">typo ×0.6</span>. A match earns <b>factor × IDF × field weight</b>; rare words (high IDF) count more. Results matching more of the query come first. Phrases like “last month”, “done” or “bills” become filters.</p>
+  <input type="text" id="qIn" value="pasport" />
+  <div class="row small" style="margin-top:6px">Try: <button class="ex" data-q="pass">pass</button><button class="ex" data-q="renewing">renewing</button><button class="ex" data-q="dentst cleaning">dentst cleaning</button><button class="ex" data-q="done last month">done last month</button><button class="ex" data-q="bills">bills</button><button class="ex" data-q="牙医">牙医</button><button class="ex" data-q="teeth">teeth</button></div>
+  <div class="chips" id="qFilters"></div>
+  <div id="qExpand" class="small"></div>
+  <table style="margin-top:8px"><thead><tr><th>result</th><th>why</th><th class="num">coverage</th><th class="num">score</th></tr></thead><tbody id="qRes"></tbody></table>
+  <div class="note" id="qNote"></div>
+</div>
+
+<!-- ========================== PART 2 ========================== -->
+<div class="part-tag" id="p2">Part 2</div>
+<h2>Search by meaning — embeddings</h2>
+<p class="lede">Text search can’t connect <code>teeth</code> with <i>Call the dentist</i> — no letters in common. An <b>embedding model</b> turns each text into a vector (bge-m3: 1,024 numbers) so that similar meanings point in similar directions.</p>
+
+<div class="card">
+  <div class="try">Step 1 · Drag the arrows</div>
+  <h3>Similarity = the angle between arrows</h3>
+  <p class="small muted">Real vectors have 1,024 dimensions; here are 2 so you can see them. Cosine similarity is the cosine of the angle: 1 = same direction, 0 = unrelated. Drag the tips.</p>
+  <div class="grid2">
+    <canvas id="vec" width="420" height="420"></canvas>
+    <div>
+      <table><tbody id="cosTable"></tbody></table>
+      <div class="note">If every arrow is stored at length 1 (“normalized”), cosine similarity is just the dot product: <span class="mono">a₁b₁ + a₂b₂ (+ … 1,024 terms)</span>. Comparing a query with 3,000 tasks is 3 million multiply-adds — a few milliseconds. No vector database needed.</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="try">Step 2 · Search by meaning</div>
+  <h3>Real similarities from bge-m3</h3>
+  <p class="small muted" id="liveNote">Pick a query. Bars are cosine similarity to each sample task; the red line is the cut-off (0.60) — below it, matches were measured to be noise.</p>
+  <div class="row"><input type="text" id="semIn" value="teeth" style="max-width:260px" /><button id="semBtn" class="primary">Compare</button><span class="small muted" id="semTime"></span></div>
+  <div class="row small" style="margin-top:6px" id="semPresets"></div>
+  <div id="semBars" style="margin-top:10px"></div>
+</div>
+
+<div class="card">
+  <div class="try">Step 3 · A lesson from measuring</div>
+  <h3>What you embed matters</h3>
+  <p class="small muted">The first version also embedded the date and status. It made matches worse — the vector partly “means” a date now. Dates became exact filters instead.</p>
+  <div class="row"><select id="dilQ" style="max-width:160px"><option>teeth</option><option>牙齿</option></select><button id="dilBtn">Measure</button></div>
+  <table style="margin-top:8px"><thead><tr><th>task text embedded</th><th class="num">similarity</th></tr></thead><tbody id="dilBody"></tbody></table>
+</div>
+
+<div class="card">
+  <div class="try">Step 4 · Edit a task</div>
+  <h3>Keeping the index current — fingerprints</h3>
+  <p class="small muted">Embedding everything takes seconds, so it’s done once and kept. Each stored vector remembers a <b>fingerprint</b> (a hash) of the text it came from. After any change, only items whose fingerprint differs get re-embedded. Rename a task: one re-embed. Move it to another day or tick it done: nothing, because dates and status aren’t part of the text.</p>
+  <table><thead><tr><th>task</th><th>day</th><th>done</th><th>fingerprint now</th><th>stored</th><th>action</th></tr></thead><tbody id="fpBody"></tbody></table>
+  <div class="row" style="margin-top:8px"><button id="fpSync" class="primary">Run the index update</button><span class="small muted" id="fpMsg"></span></div>
+</div>
+
+<div class="card">
+  <div class="try">Step 5 · Move the slider</div>
+  <h3>Merging two result lists — Reciprocal Rank Fusion</h3>
+  <p class="small muted">Text scores and cosine similarities are on unrelated scales, so they can’t be added. RRF only uses <b>positions</b>: each list gives an item <span class="mono">1 / (K + rank)</span>, and the votes add up. Items in both lists rise to the top.</p>
+  <div class="grid2">
+    <div><b class="small">Text results</b><ol id="rrfA" class="small"></ol><b class="small">Meaning results</b><ol id="rrfB" class="small"></ol></div>
+    <div><label class="small">K = <b id="kVal">60</b></label><input type="range" id="kIn" min="1" max="120" value="60" /><table><thead><tr><th>merged</th><th class="num">score</th></tr></thead><tbody id="rrfOut"></tbody></table></div>
+  </div>
+</div>
+
+<!-- ========================== PART 3 ========================== -->
+<div class="part-tag" id="p3">Part 3</div>
+<h2>Ask — answers with RAG</h2>
+<p class="lede">The LLM never sees the whole planner. <b>Retrieval-augmented generation</b>: search finds the ~12 relevant items, code turns them into a short numbered list, the model reads only that and answers with citations.</p>
+<div class="flow"><span>question</span><b>→</b><span>retrieve (parts 1 + 2)</span><b>→</b><span>prepare the list</span><b>→</b><span>LLM reads & answers [n]</span></div>
+
+<div class="card">
+  <div class="try">Step 1 · Type anything</div>
+  <h3>Is it a question?</h3>
+  <p class="small muted">Questions get an answer automatically; anything else gets an Ask button.</p>
+  <input type="text" id="isqIn" value="when did I last call the dentist?" />
+  <div style="margin-top:6px" id="isqOut"></div>
+</div>
+
+<div class="card">
+  <div class="try">Step 2 · Flip the layout</div>
+  <h3>The most important step: what the model reads</h3>
+  <p class="small muted">Same model (qwen3.5:4b), same question, same five items, the app’s real instructions — only the layout changes. The scores are real: 8 runs each. Small models read well but are unreliable at “which of these is the latest”, so the final version does that part in code.</p>
+  <div class="row small">
+    <label><input type="radio" name="lay" value="rel" /> A · relevance order</label>
+    <label><input type="radio" name="lay" value="time" /> B · grouped by time</label>
+    <label><input type="radio" name="lay" value="facts" checked /> C · grouped + “best matches” picked in code (the app)</label>
+  </div>
+  <pre id="ctxPre"></pre>
+  <div class="row"><button id="askBtn" class="primary">Ask the local model</button><span class="small muted" id="askTime"></span></div>
+  <div class="answer" id="askOut"></div>
+</div>
+
+<div class="card">
+  <h3>What we learned (the honest version)</h3>
+  <ul class="small">
+    <li>An earlier experiment suggested layout B fixes it. Re-running with the app’s exact instructions showed it doesn’t — results depended on small wording changes in the prompt. <b>Always re-measure with the exact prompt you ship.</b></li>
+    <li>The robust fix is to not ask the model to reason at all where code can: for “last …” / “next …” questions the app picks the newest past match and the soonest upcoming one among the top 5 results, and states them first (C).</li>
+    <li>Still imperfect: asked <span class="mono">上次看牙医是什么时候？</span> with a task literally titled <span class="mono">看牙医</span> (Aug 20) and a newer “Call the dentist about the cleaning” (Sep 13), the model kept choosing the literal title. Exact wording pulls small models hard — the citations let you check.</li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="try">Step 3 · Press play</div>
+  <h3>Streaming: words before the whole answer</h3>
+  <p class="small muted">Loaded model: full answer ~1.1 s, <b>first words ~0.07 s</b>. The server sends <i>server-sent events</i> — lines of <span class="mono">data: {…}</span>. A network chunk can stop mid-line, so the parser keeps the unfinished tail for next time.</p>
+  <button id="sseBtn">▶ Play a stream</button>
+  <div id="sseChunks" style="margin-top:8px"></div>
+  <div class="answer" id="sseOut"></div>
+</div>
+
+<div class="card">
+  <h3>Recap</h3>
+  <table><thead><tr><th>layer</th><th>finds</th><th>speed</th><th>needs</th></tr></thead><tbody>
+    <tr><td>1 · Text</td><td>what you typed — typos, word starts, Chinese, filters</td><td class="num">~1 ms</td><td>nothing</td></tr>
+    <tr><td>2 · Meaning</td><td>what you meant — across words and languages</td><td class="num">~20 ms + compare</td><td>bge-m3 in Ollama</td></tr>
+    <tr><td>3 · Ask</td><td>an answer, with sources</td><td class="num">~1–2 s (warm)</td><td>a chat model in Ollama</td></tr>
+  </tbody></table>
+  <p class="small muted" style="margin-top:8px">The real code is in <span class="mono">src/lib/search/</span>: <span class="mono">text.ts</span>, <span class="mono">query.ts</span>, <span class="mono">vectors.ts</span>, <span class="mono">hybrid.ts</span>, <span class="mono">ask.ts</span>.</p>
+</div>
+</main>
+
+<script>
+// ===================================================================== shared
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const OLLAMA = 'http://localhost:11434/v1';
+let ollamaOk = false;
+
+// sample planner (fixed "today" so the examples are stable)
+const TODAY = '2026-10-03';
+let DOCS = [
+  { id: 1, title: 'Renew passport', notes: 'bring two photos', ctx: '', date: '2026-10-01', done: false },
+  { id: 2, title: 'Call the dentist about the cleaning', notes: '', ctx: '', date: '2026-09-13', done: true },
+  { id: 3, title: 'Call the dentist', notes: '', ctx: '', date: '2026-09-04', done: true },
+  { id: 4, title: 'Doctor appointment', notes: '', ctx: '', date: '2026-10-05', done: false },
+  { id: 5, title: 'Buy groceries', notes: 'milk, eggs', ctx: '', date: '2026-09-29', done: true },
+  { id: 6, title: 'Back up laptop', notes: '', ctx: '', date: '2026-10-02', done: true },
+  { id: 7, title: 'Pay rent', notes: '', ctx: 'every month on the 1st · bill subscription', date: '2026-01-01', done: false, repeat: true },
+  { id: 8, title: 'Streaming service', notes: '', ctx: 'every month on the 12th · bill subscription', date: '2026-01-12', done: false, repeat: true },
+  { id: 9, title: 'Order cabinets', notes: '', ctx: 'Kitchen renovation', date: '2026-10-08', done: false },
+  { id: 10, title: '看牙医', notes: '', ctx: '', date: '2026-08-20', done: true },
+  { id: 11, title: 'Book flights to Tokyo', notes: '', ctx: '', date: '2026-10-10', done: false },
+  { id: 12, title: 'Gym membership', notes: '', ctx: 'every month on the 3rd · bill subscription', date: '2026-01-03', done: false, repeat: true },
+];
+
+// ===================================================================== part 1: the same logic as src/lib/search/text.ts
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+const normalize = (s) => s.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFKC').toLowerCase();
+function stem(w) {
+  for (let pass = 0; pass < 2; pass++) {
+    if (w.length <= 4 || /\d/.test(w)) return w;
+    const suf = ['ings', 'ing', 'ies', 'ed', 'es', 's', 'al'].find((x) => w.endsWith(x) && w.length - x.length >= 3);
+    if (!suf) return w;
+    w = suf === 'ies' ? w.slice(0, -3) + 'y' : w.slice(0, -suf.length);
+  }
+  return w;
+}
+function tokenize(s, withRaw) {
+  const out = [];
+  for (const run of normalize(s).match(/[\p{L}\p{N}]+/gu) ?? []) {
+    let latin = '', prev = '';
+    const flush = () => { if (latin) out.push({ t: stem(latin), raw: latin }); latin = ''; };
+    for (const ch of run) {
+      if (CJK.test(ch)) { flush(); out.push({ t: ch, raw: ch }); if (prev) out.push({ t: prev + ch, raw: prev + ch, bonus: true }); prev = ch; }
+      else { latin += ch; prev = ''; }
+    }
+    flush();
+  }
+  return out;
+}
+const FIELDS = [['title', 3], ['ctx', 1.5], ['notes', 1]];
+function buildIndex(docs) {
+  const postings = new Map();
+  docs.forEach((d, i) => FIELDS.forEach(([f, w]) => tokenize(d[f]).forEach(({ t }) => {
+    if (!postings.has(t)) postings.set(t, new Map());
+    const p = postings.get(t); p.set(i, Math.max(p.get(i) ?? 0, w));
+  })));
+  return { docs, postings, vocab: [...postings.keys()] };
+}
+function editDistance(a, b, max = 99) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2 = [], prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+      cur.push(v);
+    }
+    prev2 = prev; prev = cur;
+  }
+  return prev[b.length];
+}
+function expand(q, idx) {
+  const out = [];
+  if (idx.postings.has(q)) out.push([q, 1, 'exact']);
+  if (CJK.test(q)) return out;
+  if (q.length >= 2) for (const v of idx.vocab) if (v !== q && v.startsWith(q)) out.push([v, 0.75, 'start']);
+  if (q.length >= 4) { const max = q.length >= 7 ? 2 : 1; for (const v of idx.vocab) if (v !== q && !v.startsWith(q) && editDistance(q, v, max) <= max) out.push([v, 0.6, 'typo']); }
+  return out;
+}
+// filters (a few of the patterns in src/lib/search/query.ts)
+function parseQuery(input) {
+  const f = {}; let s = ` ${input.trim().replace(/[?？!.,]+/g, ' ')} `;
+  const take = (re, fn) => { s = s.replace(re, (...m) => (fn(...m) === false ? m[0] : ' ')); };
+  take(/\s(last)\s(month)(?=\s)/i, () => { f.from = '2026-09-01'; f.to = '2026-09-30'; f.label = 'last month (Sep 1–30)'; });
+  take(/\s(this)\s(week)(?=\s)/i, () => { f.from = '2026-09-28'; f.to = '2026-10-04'; f.label = 'this week'; });
+  take(/\s(coming up|upcoming|soon)(?=\s)/i, () => { f.from = TODAY; f.to = '2026-11-02'; f.label = 'next 30 days'; });
+  take(/\s(done|finished)(?=\s)/i, () => { f.status = 'done'; });
+  take(/\s(bills?|subscriptions?)(?=\s)/i, () => { f.bills = true; });
+  return { text: s.replace(/\s+/g, ' ').trim(), f };
+}
+const passes = (d, f) => (!f.status || d.done) && (!f.bills || /bill/.test(d.ctx)) && (!f.from || (d.repeat ? d.date <= f.to : d.date >= f.from && d.date <= f.to));
+function search(idx, text, f) {
+  const N = idx.docs.length, q = tokenize(text), words = q.filter((x) => !x.bonus);
+  if (!q.length) return { rows: idx.docs.filter((d) => passes(d, f)).map((d) => ({ d, score: 0, cov: 1, why: ['filters only'] })), exps: [] };
+  const score = new Map(), hits = new Map(), why = new Map(), exps = [];
+  for (const qt of q) {
+    const ex = expand(qt.t, idx); exps.push([qt, ex]);
+    const best = new Map();
+    for (const [term, factor, kind] of ex) {
+      const p = idx.postings.get(term), idf = Math.log(1 + N / p.size);
+      for (const [i, w] of p) { const v = factor * idf * w; if (v > (best.get(i)?.v ?? 0)) best.set(i, { v, term, kind, factor, idf, w }); }
+    }
+    for (const [i, b] of best) {
+      score.set(i, (score.get(i) ?? 0) + b.v * (qt.bonus ? 0.5 : 1));
+      if (!qt.bonus) hits.set(i, (hits.get(i) ?? 0) + 1);
+      if (!why.has(i)) why.set(i, []);
+      why.get(i).push(`<span class="mono">${esc(qt.t)}</span>→<span class="mono">${esc(b.term)}</span> ${b.kind} ${b.factor}×IDF ${b.idf.toFixed(2)}×w${b.w} = <b>${b.v.toFixed(2)}</b>`);
+    }
+  }
+  const need = words.length <= 2 ? words.length : Math.ceil(words.length * 0.6);
+  const rows = [];
+  for (const [i, s] of score) { const d = idx.docs[i]; const h = hits.get(i) ?? 0; if (h < need || !passes(d, f)) continue; rows.push({ d, score: s, cov: words.length ? h / words.length : 1, why: why.get(i) }); }
+  rows.sort((a, b) => b.cov - a.cov || b.score - a.score);
+  return { rows, exps };
+}
+function highlight(text, terms) {
+  const low = normalize(text); if (low.length !== text.length) return esc(text);
+  const r = [];
+  for (const t of terms) for (let i = low.indexOf(t); i >= 0; i = low.indexOf(t, i + 1)) {
+    if (!CJK.test(t) && i > 0 && /[\p{L}\p{N}]/u.test(low[i - 1])) continue;
+    let e = i + t.length; if (!CJK.test(t)) while (e < low.length && /[\p{L}\p{N}]/u.test(low[e])) e++;
+    r.push([i, e]);
+  }
+  r.sort((a, b) => a[0] - b[0]); let out = '', at = 0;
+  for (const [a, b] of r) { if (a < at) continue; out += esc(text.slice(at, a)) + '<mark>' + esc(text.slice(a, b)) + '</mark>'; at = b; }
+  return out + esc(text.slice(at));
+}
+
+// ---- step 1: tokenizer
+function renderTok() {
+  const toks = tokenize($('tokIn').value);
+  $('tokOut').innerHTML = toks.map((x) => `<span class="chip ${x.bonus ? 'bonus' : ''}" title="${esc(x.raw)}">${esc(x.t)}${x.raw !== x.t && !x.bonus ? `<span class="muted"> ← ${esc(x.raw)}</span>` : ''}</span>`).join('') || '<span class="muted small">no terms</span>';
+  $('tokNote').textContent = `normalized: “${normalize($('tokIn').value)}”`;
+}
+$('tokIn').oninput = renderTok;
+
+// ---- step 2: index
+let IDX = buildIndex(DOCS), selTerm = null;
+function renderIndex() {
+  IDX = buildIndex(DOCS);
+  const N = DOCS.length;
+  const docsOn = selTerm ? new Set(IDX.postings.get(selTerm)?.keys() ?? []) : new Set();
+  $('docList').innerHTML = DOCS.map((d, i) => `<div class="doc ${docsOn.has(i) ? 'on' : ''}"><b>${i + 1}.</b> ${esc(d.title)}${d.notes ? ` <span class="muted small">— ${esc(d.notes)}</span>` : ''}${d.ctx ? ` <span class="muted small">[${esc(d.ctx)}]</span>` : ''}</div>`).join('');
+  const terms = [...IDX.postings.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  $('idxBody').innerHTML = terms.map(([t, p]) => `<tr class="term ${t === selTerm ? 'on' : ''}" data-t="${esc(t)}"><td class="mono">${esc(t)}</td><td>${[...p].map(([i, w]) => `${i + 1}<span class="muted">(${w})</span>`).join(', ')}</td><td class="num">${Math.log(1 + N / p.size).toFixed(2)}</td></tr>`).join('');
+  document.querySelectorAll('.term').forEach((r) => (r.onclick = () => { selTerm = r.dataset.t === selTerm ? null : r.dataset.t; renderIndex(); }));
+  renderSearch(); renderFp();
+}
+$('addBtn').onclick = () => { const v = $('addIn').value.trim(); if (!v) return; DOCS.push({ id: Date.now(), title: v, notes: '', ctx: '', date: TODAY, done: false }); $('addIn').value = ''; renderIndex(); };
+$('addIn').onkeydown = (e) => e.key === 'Enter' && $('addBtn').click();
+
+// ---- step 3: edit distance table
+function renderDp() {
+  const a = normalize($('edA').value), b = normalize($('edB').value);
+  const D = [Array.from({ length: b.length + 1 }, (_, j) => j)];
+  for (let i = 1; i <= a.length; i++) { D[i] = [i]; for (let j = 1; j <= b.length; j++) { let v = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1, D[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, D[i - 2][j - 2] + 1); D[i][j] = v; } }
+  // trace one cheapest path back
+  const path = new Set(); let i = a.length, j = b.length; path.add(`${i},${j}`);
+  while (i > 0 || j > 0) { const c = []; if (i > 0 && j > 0) c.push([i - 1, j - 1]); if (i > 0) c.push([i - 1, j]); if (j > 0) c.push([i, j - 1]); const [ni, nj] = c.sort((x, y) => D[x[0]][x[1]] - D[y[0]][y[1]])[0]; i = ni; j = nj; path.add(`${i},${j}`); }
+  let h = '<tr><th></th><th>·</th>' + [...b].map((c) => `<th>${esc(c)}</th>`).join('') + '</tr>';
+  for (let r = 0; r <= a.length; r++) h += `<tr><th>${r ? esc(a[r - 1]) : '·'}</th>` + D[r].map((v, c) => `<td class="${r === a.length && c === b.length ? 'final' : path.has(`${r},${c}`) ? 'path' : ''}">${v}</td>`).join('') + '</tr>';
+  $('dp').innerHTML = h;
+  const d = D[a.length][b.length], len = a.length, allowed = len >= 7 ? 2 : len >= 4 ? 1 : 0;
+  $('edOut').innerHTML = `${d} <span class="small muted">edit${d === 1 ? '' : 's'} · ${d <= allowed ? '<span class="tag yes">counts as a typo match</span>' : `<span class="tag no">too far (allowed ${allowed})</span>`}</span>`;
+}
+$('edA').oninput = $('edB').oninput = renderDp;
+
+// ---- step 4: search lab
+function renderSearch() {
+  const { text, f } = parseQuery($('qIn').value);
+  const fchips = [f.label, f.status, f.bills && 'bills'].filter(Boolean);
+  $('qFilters').innerHTML = fchips.length ? `<span class="small muted">filters:</span>` + fchips.map((c) => `<span class="chip ok">${esc(c)}</span>`).join('') + (text ? ` <span class="small muted">text left: “${esc(text)}”</span>` : '') : '';
+  const { rows, exps } = search(IDX, text, f);
+  $('qExpand').innerHTML = exps.map(([qt, ex]) => `<div><span class="chip ${qt.bonus ? 'bonus' : ''}">${esc(qt.t)}</span> → ${ex.length ? ex.map(([t, fa, k]) => `<span class="chip ${k === 'exact' ? 'ok' : k === 'typo' ? 'amber' : ''}">${esc(t)} ×${fa}</span>`).join(' ') : '<span class="muted">nothing in the index</span>'}</div>`).join('');
+  const terms = exps.flatMap(([, ex]) => ex.map(([t]) => t));
+  $('qRes').innerHTML = rows.length ? rows.map((r) => `<tr><td>${highlight(r.d.title, terms)}</td><td class="small">${r.why.join('<br>')}</td><td class="num">${Math.round(r.cov * 100)}%</td><td class="num">${r.score.toFixed(2)}</td></tr>`).join('') : `<tr><td colspan="4" class="muted">No text match.</td></tr>`;
+  $('qNote').innerHTML = /teeth/i.test(text) && !rows.length ? 'No letters in common with “dentist” — text search can’t help. That’s what part 2 is for.' : 'Coverage first (how many query words matched), then score. Short queries must match every word.';
+}
+$('qIn').oninput = renderSearch;
+document.querySelectorAll('.ex').forEach((b) => (b.onclick = () => { $('qIn').value = b.dataset.q; renderSearch(); }));
+
+// ===================================================================== part 2
+// ---- step 1: 2D vectors
+const cv = $('vec'), cx = cv.getContext('2d');
+const arrows = [
+  { name: 'teeth (query)', a: 0.55, color: '#7c3aed' },
+  { name: 'Call the dentist', a: 0.8, color: '#2f6fed' },
+  { name: '看牙医', a: 0.95, color: '#2f9e44' },
+  { name: 'Buy groceries', a: 2.4, color: '#e5484d' },
+];
+let dragging = null;
+function drawVec() {
+  const W = cv.width, c = W / 2, R = W * 0.4, dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  cx.clearRect(0, 0, W, W);
+  cx.strokeStyle = dark ? '#3a3a40' : '#e4e1d9'; cx.beginPath(); cx.arc(c, c, R, 0, Math.PI * 2); cx.stroke();
+  cx.beginPath(); cx.moveTo(c - R - 10, c); cx.lineTo(c + R + 10, c); cx.moveTo(c, c - R - 10); cx.lineTo(c, c + R + 10); cx.stroke();
+  for (const v of arrows) {
+    const x = c + Math.cos(v.a) * R, y = c - Math.sin(v.a) * R;
+    cx.strokeStyle = cx.fillStyle = v.color; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(c, c); cx.lineTo(x, y); cx.stroke();
+    cx.beginPath(); cx.arc(x, y, 9, 0, Math.PI * 2); cx.fill();
+    cx.font = '600 14px -apple-system, sans-serif'; cx.fillText(v.name, x + (Math.cos(v.a) > 0 ? 12 : -12 - cx.measureText(v.name).width), y - 10);
+  }
+  const q = arrows[0];
+  $('cosTable').innerHTML = '<tr><th>vs query</th><th class="num">angle</th><th class="num">cosine</th></tr>' + arrows.slice(1).map((v) => { const ang = Math.abs(((v.a - q.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI); const cos = Math.cos(ang); return `<tr><td><span class="dot" style="background:${v.color}"></span> ${esc(v.name)}</td><td class="num">${Math.round((ang * 180) / Math.PI)}°</td><td class="num"><b>${cos.toFixed(2)}</b></td></tr>`; }).join('');
+}
+function pt(e) { const r = cv.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * cv.width, ((e.clientY - r.top) / r.height) * cv.height]; }
+cv.onpointerdown = (e) => { const [x, y] = pt(e), c = cv.width / 2, R = cv.width * 0.4; dragging = arrows.find((v) => Math.hypot(x - (c + Math.cos(v.a) * R), y - (c - Math.sin(v.a) * R)) < 22) ?? null; if (dragging) cv.setPointerCapture(e.pointerId); };
+cv.onpointermove = (e) => { if (!dragging) return; const [x, y] = pt(e), c = cv.width / 2; dragging.a = Math.atan2(c - y, x - c); drawVec(); };
+cv.onpointerup = () => (dragging = null);
+
+// ---- step 2: real similarities (live via Ollama, or measured numbers)
+const SEM_TASKS = ['Call the dentist about the cleaning', 'Renew vehicle registration', 'Buy groceries', '看牙医', 'Pay rent', 'Streaming service subscription', 'Book flights to Tokyo', 'Back up laptop', 'Spanish lesson', 'Gym membership'];
+// measured with bge-m3 (cosine similarity, query × each task above)
+const MEASURED = {"teeth":[0.632,0.455,0.529,0.713,0.516,0.401,0.405,0.41,0.494,0.492],"car paperwork":[0.447,0.645,0.426,0.405,0.481,0.398,0.409,0.445,0.414,0.4],"food shopping":[0.496,0.45,0.862,0.516,0.544,0.459,0.437,0.418,0.491,0.522],"trip to japan":[0.426,0.427,0.549,0.474,0.496,0.389,0.705,0.455,0.485,0.403],"牙齿":[0.658,0.409,0.461,0.765,0.44,0.352,0.321,0.378,0.455,0.475],"workout":[0.487,0.435,0.56,0.464,0.55,0.435,0.404,0.49,0.551,0.67]};
+const CUT = 0.6;
+$('semPresets').innerHTML = 'Measured examples: ' + Object.keys(MEASURED).map((q) => `<button class="semP" data-q="${q}">${q}</button>`).join('');
+document.querySelectorAll('.semP').forEach((b) => (b.onclick = () => { $('semIn').value = b.dataset.q; runSem(); }));
+async function embed(texts) {
+  const r = await fetch(OLLAMA + '/embeddings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'bge-m3', input: texts }) });
+  if (!r.ok) throw new Error('embedding failed (' + r.status + ')');
+  return (await r.json()).data.sort((a, b) => a.index - b.index).map((x) => { const n = Math.hypot(...x.embedding); return x.embedding.map((v) => v / n); });
+}
+const dotp = (a, b) => a.reduce((s, x, i) => s + x * b[i], 0);
+let taskVecs = null;
+async function runSem() {
+  const q = $('semIn').value.trim(); if (!q) return;
+  let sims, note;
+  if (ollamaOk) {
+    try {
+      const t0 = performance.now();
+      if (!taskVecs) taskVecs = await embed(SEM_TASKS);
+      const [qv] = await embed([q]);
+      sims = taskVecs.map((v) => dotp(qv, v));
+      note = `live from your bge-m3 · ${Math.round(performance.now() - t0)} ms`;
+    } catch (e) { note = 'Ollama error: ' + e.message; }
+  }
+  if (!sims) { sims = MEASURED[q]; note = sims ? 'measured earlier with bge-m3 (start Ollama to try your own words)' : 'Start Ollama with bge-m3 to try your own words — or pick a measured example.'; }
+  $('semTime').textContent = note;
+  if (!sims) { $('semBars').innerHTML = ''; return; }
+  const order = sims.map((s, i) => [s, i]).sort((a, b) => b[0] - a[0]);
+  $('semBars').innerHTML = order.map(([s, i]) => `<div class="barrow"><span>${esc(SEM_TASKS[i])}</span><span class="barwrap"><span class="bar ${s >= CUT ? 'related' : 'below'}" style="display:block;width:${Math.max(0, (s - 0.2) / 0.8) * 100}%"></span><span class="cutline" style="left:${((CUT - 0.2) / 0.8) * 100}%"></span></span><span class="num">${s.toFixed(3)}</span></div>`).join('') + '<div class="small muted">Purple = above the 0.60 cut-off (shown as “related”). Bars start at 0.2.</div>';
+}
+$('semBtn').onclick = runSem;
+$('semIn').onkeydown = (e) => e.key === 'Enter' && runSem();
+
+// ---- step 3: dilution
+async function runDil() {
+  const q = $('dilQ').value;
+  const rows = [['Call the dentist', q === 'teeth' ? 0.673 : 0.689], ['Call the dentist\nSat Jul 4 2026\ndone', q === 'teeth' ? 0.551 : 0.543]];
+  let live = false;
+  if (ollamaOk) try { const v = await embed([q, ...rows.map((r) => r[0])]); rows.forEach((r, i) => (r[1] = dotp(v[0], v[i + 1]))); live = true; } catch {}
+  $('dilBody').innerHTML = rows.map(([t, s], i) => `<tr><td class="mono small">${esc(t).replace(/\n/g, ' · ')}</td><td class="num"><b>${s.toFixed(3)}</b> ${i === 1 ? `<span class="small" style="color:var(--must)">${s < CUT ? 'below the cut-off' : ''}</span>` : ''}</td></tr>`).join('') + `<tr><td colspan="2" class="small muted">${live ? 'measured live just now' : 'measured earlier'}</td></tr>`;
+}
+$('dilBtn').onclick = runDil;
+
+// ---- step 4: fingerprints
+const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); } return (h >>> 0).toString(36); };
+const fpText = (d) => [d.title, d.notes, d.ctx].filter(Boolean).join('\n');
+let stored = new Map();
+function renderFp() {
+  const rows = DOCS.slice(0, 6);
+  if (!stored.size) rows.forEach((d) => stored.set(d.id, fnv(fpText(d))));
+  $('fpBody').innerHTML = rows.map((d, i) => { const now = fnv(fpText(d)), st = stored.get(d.id), changed = now !== st;
+    return `<tr class="${changed ? 'changed' : ''}"><td><input type="text" data-i="${i}" class="fpT" value="${esc(d.title)}" /></td><td><input type="text" data-i="${i}" class="fpD" value="${d.date}" style="width:110px" /></td><td><input type="checkbox" data-i="${i}" class="fpC" ${d.done ? 'checked' : ''} /></td><td class="fp">${now}</td><td class="fp">${st ?? '—'}</td><td class="small">${changed ? '<b>re-embed</b>' : '<span class="muted">skip</span>'}</td></tr>`; }).join('');
+  document.querySelectorAll('.fpT').forEach((el) => (el.oninput = () => { DOCS[+el.dataset.i].title = el.value; IDX = buildIndex(DOCS); renderFpOnly(el); }));
+  document.querySelectorAll('.fpD').forEach((el) => (el.onchange = () => { DOCS[+el.dataset.i].date = el.value; renderFp(); }));
+  document.querySelectorAll('.fpC').forEach((el) => (el.onchange = () => { DOCS[+el.dataset.i].done = el.checked; renderFp(); }));
+  const n = rows.filter((d) => fnv(fpText(d)) !== stored.get(d.id)).length;
+  $('fpMsg').textContent = n ? `${n} item${n > 1 ? 's' : ''} would be re-embedded (~20 ms each); the other ${rows.length - n} are skipped.` : 'Everything is up to date — nothing to send to the model.';
+}
+function renderFpOnly(el) { const pos = el.selectionStart; renderFp(); const again = document.querySelector(`.fpT[data-i="${el.dataset.i}"]`); again.focus(); again.setSelectionRange(pos, pos); }
+$('fpSync').onclick = () => { DOCS.slice(0, 6).forEach((d) => stored.set(d.id, fnv(fpText(d)))); renderFp(); $('fpMsg').textContent = 'Updated: changed items got new vectors and fingerprints.'; };
+
+// ---- step 5: RRF
+const RA = ['Call the dentist', 'Call the dentist about the cleaning', 'Doctor appointment'];
+const RB = ['看牙医', 'Call the dentist about the cleaning', 'Call the dentist', 'Gym membership'];
+$('rrfA').innerHTML = RA.map((x) => `<li>${esc(x)}</li>`).join('');
+$('rrfB').innerHTML = RB.map((x) => `<li>${esc(x)}</li>`).join('');
+function renderRrf() {
+  const K = +$('kIn').value; $('kVal').textContent = K;
+  const s = new Map(); [RA, RB].forEach((L) => L.forEach((x, r) => s.set(x, (s.get(x) ?? 0) + 1 / (K + r + 1))));
+  $('rrfOut').innerHTML = [...s].sort((a, b) => b[1] - a[1]).map(([x, v]) => `<tr><td>${esc(x)} ${RA.includes(x) && RB.includes(x) ? '<span class="tag yes">both</span>' : RB.includes(x) ? '<span class="tag no">meaning only</span>' : ''}</td><td class="num">${v.toFixed(4)}</td></tr>`).join('');
+}
+$('kIn').oninput = renderRrf;
+
+// ===================================================================== part 3
+const QSTART = /^(who|what|what's|when|where|which|why|how|did|do|does|is|are|was|were|have|has|can|could|should|will|any|list|show me|tell me)\b/i;
+const QCN = /(什么|哪|几|吗|呢|多少|怎么|为什么|是否|有没有|谁|何时|啥)/;
+function renderIsQ() {
+  const t = $('isqIn').value.trim();
+  const why = /[?？]\s*$/.test(t) ? 'ends with “?”' : QSTART.test(t) ? `starts with “${t.match(QSTART)[0]}”` : QCN.test(t) ? `contains “${t.match(QCN)[0]}”` : null;
+  $('isqOut').innerHTML = t.length >= 4 && why ? `<span class="tag yes">question</span> <span class="small muted">${why} → answered automatically</span>` : `<span class="tag no">not a question</span> <span class="small muted">→ results only; press Ask (⌘↵) for an answer</span>`;
+}
+$('isqIn').oninput = renderIsQ;
+
+const QUESTION = 'when did I last call the dentist?';
+const LIST = 'Past (newest first):\n[1] Back up laptop — Fri Oct 2 2026 (yesterday) — done\n[2] Call the dentist — Sun Sep 13 2026 (20 days ago) — done\n[3] Call the dentist — Fri Sep 4 2026 (29 days ago) — done\n[4] Call the dentist — Mon Jul 20 2026 (75 days ago) — done\nToday and later (soonest first):\n[5] Dentist appointment — Mon Oct 5 2026 (in 2 days) — open';
+const CTX = {
+  rel: 'Items:\n[1] Call the dentist — Fri Sep 4 2026 — done\n[2] Call the dentist — Sun Sep 13 2026 — done\n[3] Call the dentist — Mon Jul 20 2026 — done\n[4] Dentist appointment — Mon Oct 5 2026 — open\n[5] Back up laptop — Fri Oct 2 2026 — done',
+  time: 'Items:\n' + LIST,
+  facts: 'Best matches for the question (worked out from the list below):\n- Most recent past: [2] Call the dentist — Sun Sep 13 2026 (20 days ago)\n\nItems:\n' + LIST,
+};
+// recorded with the app's instructions, temperature 0 — 8 runs each (two phrasings × 4)
+const RECORDED = {
+  rel: ['You last called the dentist on Sun Sep 13 2026 [2].', 'good', 'right 8/8 — here. But relevance order changes with every search, so this is luck, not design.'],
+  time: ['You last called the dentist on Fri Sep 4 2026 [3].', 'bad', 'wrong 8/8 — one unrelated item (“Back up laptop”) at the top was enough to throw it.'],
+  facts: ['You last called the dentist on Sun Sep 13 2026 [2].', 'good', 'right 8/8 — the code picked the most recent match; the model only had to say it.'],
+};
+const APP_PROMPT = ["You answer questions about the user's own planner. Today is Sat Oct 3 2026.", 'Use ONLY the numbered items given. Reply in 1–3 short sentences, in the language of the question.', 'Cite the items you rely on like [2] or [1][4]. Copy dates as written; do not calculate new ones.', 'If the items do not answer the question, say so plainly in one sentence.'].join('\n');
+const lay = () => document.querySelector('input[name=lay]:checked').value;
+function renderCtx() {
+  $('ctxPre').textContent = `${CTX[lay()]}\n\nQuestion: ${QUESTION}`;
+  const [a, cls, note] = RECORDED[lay()];
+  $('askOut').className = 'answer ' + cls; $('askOut').innerHTML = cite(a); $('askTime').textContent = note;
+}
+const cite = (s) => esc(s).replace(/\[(\d+)\]/g, '<span class="cite">$1</span>');
+document.querySelectorAll('input[name=lay]').forEach((r) => (r.onchange = renderCtx));
+$('askBtn').onclick = async () => {
+  if (!ollamaOk) { $('askTime').textContent = 'Start Ollama with qwen3.5:4b to run this live — showing the recorded answer.'; return; }
+  const body = { model: 'qwen3.5:4b', stream: true, temperature: 0, max_tokens: 120, reasoning_effort: 'none', messages: [
+    { role: 'system', content: APP_PROMPT },
+    { role: 'user', content: `${CTX[lay()]}\n\nQuestion: ${QUESTION}` } ] };
+  $('askOut').className = 'answer'; $('askOut').textContent = '…'; const t0 = performance.now(); let first = 0, txt = '';
+  try {
+    const r = await fetch(OLLAMA + '/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for (;;) { const { done, value } = await rd.read(); if (done) break; buf += dec.decode(value, { stream: true }); const lines = buf.split('\n'); buf = lines.pop();
+      for (const l of lines) if (l.startsWith('data: ') && l.trim() !== 'data: [DONE]') { const d = JSON.parse(l.slice(6)).choices?.[0]?.delta?.content; if (d) { if (!first) first = performance.now() - t0; txt += d; $('askOut').innerHTML = cite(txt); } } }
+    $('askTime').textContent = `live · first words ${Math.round(first)} ms · total ${Math.round(performance.now() - t0)} ms` + (first > 3000 ? ' (the model was loading — try again)' : '');
+  } catch (e) { $('askTime').textContent = 'error: ' + e.message; }
+};
+
+// streaming demo: a recorded stream cut into network chunks at awkward places
+const STREAM = ['data: {"choices":[{"delta":{"content":"You last"}}]}\n\ndata: {"choices":[{"de', 'lta":{"content":" called the dentist"}}]}\n\ndata: {"choices":[{"delta":{"content":" on Sunday, September 13"}}]}\n', '\ndata: {"choices":[{"delta":{"content":", 2026 [2]."}}]}\n\ndata: [DONE]\n'];
+$('sseBtn').onclick = async () => {
+  $('sseChunks').innerHTML = ''; $('sseOut').innerHTML = ''; let buf = '', txt = '';
+  for (const [i, ch] of STREAM.entries()) {
+    await new Promise((r) => setTimeout(r, 700));
+    $('sseChunks').insertAdjacentHTML('beforeend', `<div><span class="small muted">chunk ${i + 1}:</span> <span class="chunk new">${esc(ch.replace(/\n/g, '⏎'))}</span></div>`);
+    const lines = (buf + ch).split('\n'); buf = lines.pop();
+    for (const l of lines) if (l.startsWith('data: ') && l.trim() !== 'data: [DONE]') { txt += JSON.parse(l.slice(6)).choices[0].delta.content; }
+    $('sseOut').innerHTML = cite(txt) + (buf ? ` <span class="small muted">· kept for next chunk: <span class="mono">${esc(buf)}</span></span>` : '');
+  }
+};
+
+// ===================================================================== boot
+async function checkOllama() {
+  try {
+    const r = await fetch(OLLAMA + '/models', { signal: AbortSignal.timeout(1500) });
+    const ids = (await r.json()).data.map((m) => m.id);
+    ollamaOk = ids.some((x) => x.startsWith('bge-m3'));
+    $('odot').classList.toggle('on', ollamaOk);
+    $('ostat').textContent = ollamaOk ? `Ollama: live (${ids.filter((x) => /bge-m3|qwen/.test(x)).join(', ')})` : 'Ollama running, but no bge-m3 — showing measured numbers';
+  } catch {
+    $('ostat').textContent = 'Ollama not reachable — showing measured numbers';
+  }
+}
+const parts = ['p1', 'p2', 'p3'];
+addEventListener('scroll', () => { let on = 'p1'; for (const p of parts) if ($(p).getBoundingClientRect().top < 140) on = p; document.querySelectorAll('nav a').forEach((a) => a.classList.toggle('on', a.dataset.part === on)); });
+renderTok(); renderIndex(); renderDp(); drawVec(); renderRrf(); renderIsQ(); renderCtx(); runDil();
+checkOllama().then(runSem);
+</script>
+</body>
+</html>

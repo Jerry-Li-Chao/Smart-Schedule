@@ -26,7 +26,7 @@ export async function askStream(question: string, ctx: AskContext, today: ISODat
     reasoning_effort: 'none', // Ollama: no hidden "thinking" before the answer
     messages: [
       { role: 'system', content: systemPrompt(today) },
-      { role: 'user', content: `Items:\n${ctx.text || '(nothing relevant found)'}\n\nQuestion: ${question}` },
+      { role: 'user', content: `${ctx.text.startsWith('Best matches') ? '' : 'Items:\n'}${ctx.text || '(nothing relevant found)'}\n\nQuestion: ${question}` },
     ],
   });
   let buf = '';

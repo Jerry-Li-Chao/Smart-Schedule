@@ -77,7 +77,7 @@ export function SearchPanel({ today }: { today: ISODate }) {
     if (!llmOk || !question.trim()) return;
     // nothing matched the words, but there are filters ("bills coming up"): read what fits the filters
     const pool = hits.length ? hits.map((h) => h.doc) : searchText(index, '', parsed.filters, today).map((h) => h.doc);
-    const ctx = buildContext(pool, entities, today);
+    const ctx = buildContext(pool, entities, today, question);
     const key = `${question.trim()}|${ctx.refs.join(',')}`;
     if (answer?.key === key) return;
     const hit = answerCache.get(key);

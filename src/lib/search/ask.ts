@@ -44,8 +44,19 @@ export interface AskContext {
   refs: string[];
 }
 
-/** The retrieved items as a short numbered list, grouped by time so "last" and "next" are easy to read off. */
-export function buildContext(docs: SearchDoc[], entities: Record<string, Entity>, today: ISODate): AskContext {
+const ASKS_LAST = /\b(last|latest|most recent|recently|previous|when did)\b|上次|上一次|最近|上回/i;
+const ASKS_NEXT = /\b(next|upcoming|coming up|soonest|when is|when's|when will)\b|下次|下一次|接下来|即将/i;
+/** How many of the most relevant results the "best matches" lines may come from. */
+const FACT_POOL = 5;
+
+/**
+ * The retrieved items as a short numbered list, grouped by time.
+ * For "last …" / "next …" questions the code also picks the answer candidates itself — the most
+ * recent past match and the soonest upcoming one among the top results — and states them first.
+ * Measured with qwen3.5:4b: a single unrelated item at the top of the list made it name the wrong
+ * "last" visit 8 times out of 8; with these lines it was right every time.
+ */
+export function buildContext(docs: SearchDoc[], entities: Record<string, Entity>, today: ISODate, question = ''): AskContext {
   const pick = docs.slice(0, MAX_ITEMS);
   const past: SearchDoc[] = [];
   const ahead: SearchDoc[] = [];
@@ -108,7 +119,22 @@ export function buildContext(docs: SearchDoc[], entities: Record<string, Entity>
     lines.push('No date (sticky notes, projects):');
     for (const d of undated) add(d, d.kind === 'project' ? 'project' : 'sticky note, not scheduled');
   }
-  return { text: lines.join('\n'), refs };
+  // the answer candidates, worked out in code from the most relevant few
+  const facts: string[] = [];
+  const top = pick.slice(0, FACT_POOL).filter((d) => d.date && d.kind !== 'repeat');
+  const num = (d: SearchDoc) => refs.indexOf(d.id) + 1;
+  const wantsLast = ASKS_LAST.test(question);
+  const wantsNext = ASKS_NEXT.test(question);
+  if (wantsLast) {
+    const last = top.filter((d) => d.date! <= today && d.status === 'done').sort((a, b) => b.date!.localeCompare(a.date!))[0];
+    if (last) facts.push(`- Most recent past: [${num(last)}] ${last.title} — ${day(last.date!)} (${rel(last.date!, today)})`);
+  }
+  if (wantsNext) {
+    const next = top.filter((d) => d.date! >= today && d.status === 'open').sort((a, b) => a.date!.localeCompare(b.date!))[0];
+    if (next) facts.push(`- Next upcoming: [${num(next)}] ${next.title} — ${day(next.date!)} (${rel(next.date!, today)})`);
+  }
+  const head = facts.length ? `Best matches for the question (worked out from the list below):\n${facts.join('\n')}\n\nItems:\n` : '';
+  return { text: head + lines.join('\n'), refs };
 }
 
 /** Pull the text pieces out of a stream of server-sent events ("data: {…}" lines). */

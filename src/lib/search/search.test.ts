@@ -120,4 +120,15 @@ describe('ask', () => {
     expect(ctx.text).toMatch(/Streaming service — every month on the 12th — \$15.49 — next Mon Oct 12 2026 \(in 10 days\)/);
     expect(ctx.refs.length).toBe(4);
   });
+  it('works out "last" and "next" in code for those questions', async () => {
+    const { buildContext } = await import('./ask');
+    const docs = buildDocs(data, today);
+    const pick = ['b', 'c', 'a', 'd'].map((id) => docs.find((d) => d.id === id)!);
+    const next = buildContext(pick, data, today, 'when is my next dentist visit?').text;
+    expect(next).toMatch(/^Best matches for the question[^\n]*\n- Next upcoming: \[\d\] Call the dentist about the cleaning — Mon Oct 5 2026 \(in 3 days\)/);
+    const last = buildContext(pick, data, today, 'when did I last buy groceries').text;
+    expect(last).toContain('- Most recent past: [');
+    expect(last).toContain('Buy groceries — Fri Oct 2 2026 (today)');
+    expect(buildContext(pick, data, today, 'what is in my notes').text.startsWith('Best matches')).toBe(false);
+  });
 });
