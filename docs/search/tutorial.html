@@ -281,10 +281,16 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
 <div class="card">
   <div class="try">Step 5 · Move the slider</div>
   <h3>Merging two result lists — Reciprocal Rank Fusion</h3>
-  <p class="small muted">Text scores and cosine similarities are on unrelated scales, so they can’t be added. RRF only uses <b>positions</b>: each list gives an item <span class="mono">1 / (K + rank)</span>, and the votes add up. Items in both lists rise to the top.</p>
-  <div class="grid2">
-    <div><b class="small">Text results</b><ol id="rrfA" class="small"></ol><b class="small">Meaning results</b><ol id="rrfB" class="small"></ol></div>
-    <div><label class="small">K = <b id="kVal">60</b></label><input type="range" id="kIn" min="1" max="120" value="60" /><table><thead><tr><th>merged</th><th class="num">score</th></tr></thead><tbody id="rrfOut"></tbody></table></div>
+  <div class="small" style="margin-bottom:8px">
+    <p style="margin:0 0 6px"><b>The problem.</b> Text search (part 1) and meaning search (part 2) each return a ranked list. We want <i>one</i> list. Adding their scores doesn't work: a text score like <span class="mono">11.68</span> and a cosine like <span class="mono">0.71</span> are on unrelated scales, so the bigger-numbered list would simply win.</p>
+    <p style="margin:0 0 6px"><b>The idea: ignore the scores, use the positions.</b> Being 1st in a list means the same thing in both lists. The method is called <b>Reciprocal Rank Fusion</b> (RRF): <i>rank</i> = an item's position in a list (1st, 2nd, 3rd…), <i>reciprocal</i> = “1 divided by”, <i>fusion</i> = merging the lists.</p>
+    <div class="mono" style="margin:6px 0;padding:8px 10px;background:var(--bg);border-radius:6px">RRF score(task) = Σ over the lists the task appears in:  1 / (K + rank in that list)</div>
+    <p style="margin:0 0 6px">So each list hands a task some points — more for a higher position — and the points are added. A task missing from a list gets nothing from it. The table on the right shows every sum.</p>
+    <p style="margin:0"><b>What K does.</b> Without K, 1st place gets 1/1 = 1 and 2nd gets 1/2 = 0.5 — the top spot is worth double, so one list's favourite dominates. With K = 60, 1st gets 1/61 ≈ 0.0164 and 2nd 1/62 ≈ 0.0161 — almost the same. Then what really counts is <b>appearing in both lists</b>: two lists agreeing is stronger evidence than one list's exact order. 60 is the value from the paper that introduced RRF (Cormack, Clarke &amp; Büttcher, 2009), found to work well across many search tasks, and it's the usual default. Try it: at <b>K = 0</b>, 看牙医 — found by only one list — ties with <i>Call the dentist about the cleaning</i>, which both lists agreed on. At <b>K = 60</b> the agreed-on tasks pull clearly ahead (0.0323 vs 0.0164).</p>
+  </div>
+  <div class="grid2" style="align-items:start">
+    <div><b class="small">Text results (part 1)</b><ol id="rrfA" class="small"></ol><b class="small">Meaning results (part 2)</b><ol id="rrfB" class="small"></ol><div class="small muted" id="kPts"></div></div>
+    <div><label class="small">K = <b id="kVal">60</b></label><input type="range" id="kIn" min="0" max="120" value="60" /><table><thead><tr><th class="num">#</th><th>merged list</th><th>points</th><th class="num">total</th></tr></thead><tbody id="rrfOut"></tbody></table></div>
   </div>
 </div>
 
@@ -781,8 +787,15 @@ $('rrfA').innerHTML = RA.map((x) => `<li>${esc(x)}</li>`).join('');
 $('rrfB').innerHTML = RB.map((x) => `<li>${esc(x)}</li>`).join('');
 function renderRrf() {
   const K = +$('kIn').value; $('kVal').textContent = K;
-  const s = new Map(); [RA, RB].forEach((L) => L.forEach((x, r) => s.set(x, (s.get(x) ?? 0) + 1 / (K + r + 1))));
-  $('rrfOut').innerHTML = [...s].sort((a, b) => b[1] - a[1]).map(([x, v]) => `<tr><td>${esc(x)} ${RA.includes(x) && RB.includes(x) ? '<span class="tag yes">both</span>' : RB.includes(x) ? '<span class="tag no">meaning only</span>' : ''}</td><td class="num">${v.toFixed(4)}</td></tr>`).join('');
+  const pts = (r) => 1 / (K + r), f = (x) => x.toFixed(4);
+  $('kPts').innerHTML = `With K = ${K}: 1st place = 1/${K + 1} = ${f(pts(1))}, 2nd = 1/${K + 2} = ${f(pts(2))}, 3rd = 1/${K + 3} = ${f(pts(3))}${K <= 5 ? ' — the top spot counts far more' : ' — positions count almost the same'}.`;
+  const items = [...new Set([...RA, ...RB])].map((x) => {
+    const ra = RA.indexOf(x) + 1, rb = RB.indexOf(x) + 1, parts = [];
+    if (ra) parts.push(`text #${ra}: 1/(${K}+${ra}) = ${f(pts(ra))}`);
+    if (rb) parts.push(`meaning #${rb}: 1/(${K}+${rb}) = ${f(pts(rb))}`);
+    return { x, ra, rb, parts, v: (ra ? pts(ra) : 0) + (rb ? pts(rb) : 0) };
+  }).sort((a, b) => b.v - a.v);
+  $('rrfOut').innerHTML = items.map((it, k) => `<tr><td class="num"><b>${k + 1}</b></td><td>${esc(it.x)} ${it.ra && it.rb ? '<span class="tag yes">both</span>' : it.rb ? '<span class="tag no">meaning only</span>' : '<span class="tag">text only</span>'}</td><td class="small">${it.parts.join('<br>+ ')}</td><td class="num">${f(it.v)}</td></tr>`).join('');
 }
 $('kIn').oninput = renderRrf;
 
