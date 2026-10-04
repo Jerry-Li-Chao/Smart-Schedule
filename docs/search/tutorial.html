@@ -156,6 +156,7 @@ canvas { width: 100%; max-width: 420px; aspect-ratio: 1; border-radius: 12px; ba
       <li><b>Move down</b>, from the cell directly above <i>to</i> this cell: only the first word gains a letter, so that letter has to be <i>deleted</i>, +1.</li>
       <li><b>Move right</b>, from the cell directly to the left <i>to</i> this cell: only the second word gains a letter, so it has to be <i>inserted</i>, +1.</li>
     </ul>
+    <p><b>Why the diagonal is its own move.</b> In the table it lands where “down, then right” would — but it's cheaper. For <code>pa</code> → <code>pt</code>, down-then-right means delete “a”, then insert “t”: <b>2 edits</b>. The diagonal replaces “a” with “t”: <b>1 edit</b>. And when the letters match (<code>pa</code> → <code>pa</code>) it's free, where down-then-right would delete “a” and insert it again for 2. A mistyped letter is one typo, so it should cost one edit, not two. (The swap move exists for the same reason: two swapped letters would otherwise cost two replaces.)</p>
     <p>As a formula, with <code>A</code> the first word, <code>B</code> the second and <code>D[i][j]</code> the cell in row <i>i</i>, column <i>j</i>:</p>
     <pre class="mono" style="background:var(--bg);padding:8px 10px;border-radius:6px;overflow:auto;margin:0 0 6px">D[0][j] = j          D[i][0] = i
 D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or replace
@@ -520,16 +521,19 @@ function explainCell(r, c) {
   else {
     const same = a[r - 1] === b[c - 1];
     const cell = (rr, cc) => `“${esc(a.slice(0, rr) || '—')}” → “${esc(b.slice(0, cc) || '—')}”`;
+    const q = (x) => `“${esc(x)}”`;
+    const A1 = a.slice(0, r - 1), B1 = b.slice(0, c - 1), la = a[r - 1], lb = b[c - 1];
+    const done = (rr, cc) => `First turn ${q(a.slice(0, rr) || '—')} into ${q(b.slice(0, cc) || '—')}: ${D[rr][cc]} edit${D[rr][cc] === 1 ? '' : 's'} (that cell is already worked out).`;
     const opts = [
-      [`Move diagonally from ${cell(r - 1, c - 1)} (${D[r - 1][c - 1]} edit${D[r - 1][c - 1] === 1 ? '' : 's'}), adding “${a[r - 1]}” to the first word and “${b[c - 1]}” to the second: ${same ? 'same letter, +0' : `different letters, replace “${a[r - 1]}” with “${b[c - 1]}”, +1`}`, D[r - 1][c - 1] + (same ? 0 : 1), [r - 1, c - 1]],
-      [`Move down from ${cell(r - 1, c)} (${D[r - 1][c]}), adding “${a[r - 1]}” to the first word only: delete it, +1`, D[r - 1][c] + 1, [r - 1, c]],
-      [`Move right from ${cell(r, c - 1)} (${D[r][c - 1]}), adding “${b[c - 1]}” to the second word only: insert it, +1`, D[r][c - 1] + 1, [r, c - 1]],
+      [`<b>Move diagonally</b> from the cell ${q(A1 || '—')} → ${q(B1 || '—')}. ${q(A)} is ${q(A1 || '')} + “${la}”. ${done(r - 1, c - 1).replace('First turn', 'First turn its')} The first word now reads ${q(B1)} + the untouched “${la}” = ${q(B1 + la)}. ${same ? `Its last letter “${la}” is already right — no edit needed: ${D[r - 1][c - 1]} + 0` : `Replace its last letter “${la}” with “${lb}” to get ${q(B)} — one more edit: ${D[r - 1][c - 1]} + 1`}`, D[r - 1][c - 1] + (same ? 0 : 1), [r - 1, c - 1]],
+      [`<b>Move down</b> from the cell ${q(A1 || '—')} → ${q(B || '—')}. ${q(A)} is ${q(A1 || '')} + “${la}”. ${done(r - 1, c).replace('First turn', 'First turn its')} The first word now reads ${q(B)} + the untouched “${la}” = ${q(B + la)} — one letter too many. Delete the “${la}” to get ${q(B)} — one more edit: ${D[r - 1][c]} + 1`, D[r - 1][c] + 1, [r - 1, c]],
+      [`<b>Move right</b> from the cell ${q(A || '—')} → ${q(B1 || '—')}. ${done(r, c - 1).replace('First turn', 'First turn the whole first word')} The first word now reads ${q(B1)} — one letter short of ${q(B)}. Insert “${lb}” at the end to get ${q(B)} — one more edit: ${D[r][c - 1]} + 1`, D[r][c - 1] + 1, [r, c - 1]],
     ];
-    if (r > 1 && c > 1 && a[r - 1] === b[c - 2] && a[r - 2] === b[c - 1]) opts.push([`Swap from ${cell(r - 2, c - 2)} (${D[r - 2][c - 2]}): “${a[r - 2]}${a[r - 1]}” is “${b[c - 2]}${b[c - 1]}” swapped, +1`, D[r - 2][c - 2] + 1, [r - 2, c - 2]]);
+    if (r > 1 && c > 1 && a[r - 1] === b[c - 2] && a[r - 2] === b[c - 1]) opts.push([`<b>Swap</b> from the cell ${q(a.slice(0, r - 2) || '—')} → ${q(b.slice(0, c - 2) || '—')}. ${done(r - 2, c - 2)} The word now ends in “${a[r - 2]}${a[r - 1]}”; swap the two letters to get ${q(B)} — one more edit: ${D[r - 2][c - 2]} + 1`, D[r - 2][c - 2] + 1, [r - 2, c - 2]]);
     const best = opts.find(([, x]) => x === v);
     document.querySelectorAll('#dp td.src').forEach((x) => x.classList.remove('src'));
     document.querySelector(`#dp td[data-r="${best[2][0]}"][data-c="${best[2][1]}"]`)?.classList.add('src');
-    how = `Three ways to reach this cell — the <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange-outlined</span> cell in the table is where the cheapest way starts:<ol style="margin:4px 0;padding-left:18px">` + opts.map(([t, x]) => `<li style="margin-bottom:4px">${x === v ? `<b>${t} = ${x}</b> ✓` : `<span class="muted">${t} = ${x}</span>`}</li>`).join('') + '</ol>';
+    how = `Every edit adds 1 to the count. Three ways to reach this cell — the <span style="outline:2px solid var(--amber);outline-offset:-2px;padding:0 4px">orange-outlined</span> cell in the table is where the cheapest way starts:<ol style="margin:4px 0;padding-left:18px">` + opts.map(([t, x]) => `<li style="margin-bottom:4px">${x === v ? `<b>${t} = ${x}</b> ✓` : `<span class="muted">${t} = ${x}</span>`}</li>`).join('') + '</ol>';
   }
   $('edCell').innerHTML = `<b>Cell: “${esc(A || '—')}” → “${esc(B || '—')}” = ${v}</b><br>${v} edit${v === 1 ? ' turns' : 's turn'} “${esc(A)}” into “${esc(B)}”.<br><br>${how}${r === a.length && c === b.length ? '<br><br>This is the bottom-right cell: whole word vs whole word — the answer.' : ''}`;
 }
