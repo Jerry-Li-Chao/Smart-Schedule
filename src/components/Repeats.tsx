@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Check, Hourglass, Repeat, RotateCw } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, CreditCard, Hourglass, Repeat, RotateCw, Zap } from 'lucide-react';
 import type { Importance, ISODate } from '../types';
 import { S, useStore } from '../store';
-import { addMonths, diffDays, fmtDay, relDay } from '../lib/date';
+import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
 import { describeRecurrence, occurrenceNumber } from '../lib/recurrence';
-import { repeatInfos, type Cadence, type RepeatInfo } from '../lib/repeats';
+import { activeBills, chargesBetween, monthlyCost, repeatInfos, type Cadence, type RepeatInfo } from '../lib/repeats';
+import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
 import { capture, setItemStatus, updateTask } from '../actions';
-import { isSubmitKey } from './ui';
+import { isSubmitKey, Segmented } from './ui';
 
 const GROUPS: { cadence: Cadence; label: string }[] = [
   { cadence: 'daily', label: 'Daily' },
@@ -21,6 +22,7 @@ type Filter = 'all' | 'today' | 'week' | 'missed' | 'ending';
 /** Everything that repeats, in one place: what's next, how it's been going, what needs renewing. */
 export function Repeats({ today }: { today: ISODate }) {
   const entities = useStore((s) => s.entities);
+  useStore((s) => s.settings.currency); // re-render amounts when the currency changes
   const [filter, setFilter] = useState<Filter>('all');
   const [v, setV] = useState('');
   const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
@@ -60,7 +62,7 @@ export function Repeats({ today }: { today: ISODate }) {
         <Repeat size={16} />
         <input
           value={v}
-          placeholder="Add a repeat — e.g. “Pay rent every month on the 1st”, “Protein shake every day”, “Renew passport every 10 years”"
+          placeholder="Add a repeat — e.g. “Pay rent every month on the 1st”, “Streaming $15.49 every month on the 12th autopay”, “Protein shake every day”"
           onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => isSubmitKey(e) && add()}
         />
@@ -68,6 +70,8 @@ export function Repeats({ today }: { today: ISODate }) {
           Add
         </button>
       </div>
+
+      <MoneyPanel today={today} />
 
       <div className="rp-sum">
         {(
@@ -143,7 +147,11 @@ function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
     <div className={cls('rp-card', !t.allDay && `lvl-${t.importance}`, t.allDay && 'is-event', r.ended && 'ended')} onClick={open}>
       <div className="rp-top">
         <div className="rp-title">{t.title.replace(/\s+#\s*$/, '')}</div>
-        {r.today === 'open' && !t.allDay && (
+        {t.cost?.autopay ? (
+          <span className="rp-auto" title="Pays itself — nothing to tick off">
+            <Zap size={11} /> Auto-pay
+          </span>
+        ) : r.today === 'open' && !t.allDay && (
           <button
             className="btn tiny rp-done"
             title="Done for today"
@@ -155,7 +163,7 @@ function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
             <Check size={13} /> Done
           </button>
         )}
-        {r.today === 'done' && (
+        {r.today === 'done' && !t.cost?.autopay && (
           <span className="rp-ok">
             <Check size={12} /> today
           </span>
@@ -165,6 +173,12 @@ function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
         <RotateCw size={11} /> {describeRecurrence(t.recurrence!, t.date!)}
         {t.time && ` · ${t.time}`}
       </div>
+      {!!t.cost?.amount && (
+        <div className="rp-cost">
+          <b>{fmtMoney(t.cost.amount)}</b> each time
+          {t.recurrence!.freq !== 'monthly' || t.recurrence!.interval > 1 ? <span className="muted"> · ≈ {fmtMoney(monthlyCost(t))}/mo</span> : null}
+        </div>
+      )}
 
       <div className="rp-next">
         {r.next ? (
@@ -217,5 +231,105 @@ function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
         </div>
       )}
     </div>
+  );
+}
+
+type Span = '7' | '30' | '90' | '365';
+
+/** Bills and subscriptions: an amortized monthly total, what's actually charged soon, and where it goes. */
+function MoneyPanel({ today }: { today: ISODate }) {
+  const entities = useStore((s) => s.entities);
+  const currency = useStore((s) => s.settings.currency || 'USD');
+  const [span, setSpan] = useState<Span>('30');
+  const bills = useMemo(() => activeBills(entities, today), [entities, today]);
+  const charges = useMemo(() => chargesBetween(entities, today, addDays(today, Number(span) - 1)), [entities, today, span]);
+  if (!bills.length)
+    return (
+      <div className="money-hint">
+        <CreditCard size={14} /> Track bills and subscriptions: give a repeat a cost (in its panel, or type “$15.49”) and see your monthly total here.
+      </div>
+    );
+
+  const monthly = bills.reduce((a, t) => a + monthlyCost(t), 0);
+  const ranked = [...bills].sort((a, b) => monthlyCost(b) - monthlyCost(a));
+  const top = monthlyCost(ranked[0]) || 1;
+  const auto = bills.filter((t) => t.cost?.autopay).length;
+  const soonTotal = charges.reduce((a, c) => a + c.amount, 0);
+  const open = (id: string) => S().setUI({ selectedId: id, occDate: undefined });
+
+  return (
+    <section className="money">
+      <div className="money-total">
+        <div className="mt-label">
+          <CreditCard size={14} /> Bills & subscriptions
+          <select className="mt-cur" value={currency} onChange={(e) => S().setSettings({ currency: e.target.value })} title="Currency">
+            {['USD', 'EUR', 'GBP', 'CNY', 'JPY', 'CAD', 'AUD', 'INR', 'HKD', 'SGD'].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div className="mt-big">{fmtMoney(monthly)}</div>
+        <div className="mt-sub">a month, on average</div>
+        <div className="mt-row">
+          <span>
+            <b>{fmtMoney(monthly * 12, { cents: false })}</b> a year
+          </span>
+          <span>
+            <b>{bills.length}</b> bill{bills.length > 1 ? 's' : ''}
+          </span>
+          <span>
+            <b>{auto}</b> on auto-pay
+          </span>
+        </div>
+        <div className="mt-note">Yearly and weekly charges are spread evenly over the months.</div>
+      </div>
+
+      <div className="money-soon">
+        <div className="ms-head">
+          <b>Coming up</b>
+          <span className="ms-sum">{fmtMoney(soonTotal)}</span>
+          <span className="spacer" />
+          <Segmented
+            className="tiny-seg"
+            value={span}
+            onChange={setSpan}
+            options={[
+              { value: '7', label: '7D' },
+              { value: '30', label: '30D' },
+              { value: '90', label: '90D' },
+              { value: '365', label: '1Y' },
+            ]}
+          />
+        </div>
+        {charges.length ? (
+          <ul className="ms-list">
+            {charges.map((c) => (
+              <li key={`${c.task.id}${c.date}`} onClick={() => open(c.task.id)}>
+                <span className="ms-date">{c.date === today ? 'Today' : fmtDay(c.date, today)}</span>
+                <span className="ms-name">{c.task.title.replace(/\s+#\s*$/, '')}</span>
+                {c.task.cost?.autopay && <Zap size={11} className="ms-auto" />}
+                <span className="ms-amt">{fmtMoney(c.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="muted small">Nothing charged in this stretch.</div>
+        )}
+      </div>
+
+      <div className="money-split">
+        <b>Per month</b>
+        {ranked.slice(0, 8).map((t) => (
+          <div key={t.id} className="mx-row" onClick={() => open(t.id)} title={`${Math.round((monthlyCost(t) / monthly) * 100)}% of the total`}>
+            <span className="mx-name">{t.title.replace(/\s+#\s*$/, '')}</span>
+            <span className="mx-bar">
+              <i style={{ width: `${(monthlyCost(t) / top) * 100}%` }} />
+            </span>
+            <span className="mx-amt">{fmtMoney(monthlyCost(t))}</span>
+          </div>
+        ))}
+        {ranked.length > 8 && <div className="muted small">…and {ranked.length - 8} more</div>}
+      </div>
+    </section>
   );
 }

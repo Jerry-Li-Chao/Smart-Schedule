@@ -94,6 +94,7 @@ export function taskFromParsed(p: Parsed, extra: Partial<Task> = {}): Task {
     recurrence: p.recurrence,
     deadline: p.deadline,
     remindAt: allDay ? undefined : defaultReminder(date, p.time, today),
+    ...(p.cost && (p.cost.amount || p.cost.autopay) ? { cost: p.cost } : {}),
     ...(allDay ? { allDay: true, ...(p.days && p.days > 1 && !p.recurrence ? { endDate: addDays(date!, p.days - 1) } : {}) } : {}),
     ...extra,
   });

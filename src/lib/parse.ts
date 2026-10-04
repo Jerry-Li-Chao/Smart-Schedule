@@ -16,6 +16,8 @@ export interface Parsed {
   importance?: Importance;
   recurrence?: Recurrence;
   deadline?: ISODate;
+  /** "$15.99", "15.99 USD", "¥30" — what a bill costs; "autopay" marks it as paying itself */
+  cost?: { amount: number; autopay?: boolean };
   /** "all day" / "全天", or a length like "for 4 days" */
   allDay?: boolean;
   days?: number;
@@ -60,6 +62,12 @@ export function parseQuick(input: string, today: ISODate): Parsed {
   };
   let byDeadline = false;
 
+  // bills: "Streaming $15.49 every month on the 12th autopay"
+  take(/\s(?:auto[- ]?pay|自动扣款|自动付款)(?=\s)/i, () => { out.cost = { amount: out.cost?.amount ?? 0, autopay: true }; });
+  take(/\s(?:[$€£¥]\s?(\d+(?:[.,]\d{1,2})?)|(\d+(?:\.\d{1,2})?)\s?(?:usd|eur|gbp|cny|rmb|dollars?|元|块))(?=\s)/i, (_m, a, b) => {
+    out.cost = { ...out.cost, amount: Number((a ?? b).replace(',', '.')) };
+  });
+
   // all-day events: "Thanksgiving nov 26 all day", "Vacation oct 10 for 4 days", "休假 10月10日 4天"
   take(/\s(?:all[- ]day|全天)(?=\s)/i, () => { out.allDay = true; });
   take(/\sfor\s+(\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+days?(?=\s)/i, (_m, n) => {
@@ -101,6 +109,11 @@ export function parseQuick(input: string, today: ISODate): Parsed {
   take(/\b(daily|weekly|monthly|yearly|annually)\b/i, (m) => {
     const f = m.toLowerCase() === 'annually' ? 'yearly' : m.toLowerCase();
     out.recurrence = { freq: f as Recurrence['freq'], interval: 1 };
+  });
+  // "every week on fri", "weekly on mon and thu"
+  take(new RegExp(`\\son\\s+(${WD_RE}(?:\\s*(?:,|and|&)\\s*${WD_RE})*)(?=\\s)`, 'i'), (_m, list) => {
+    if (out.recurrence?.freq !== 'weekly' || out.recurrence.byWeekday?.length) return false;
+    out.recurrence.byWeekday = list.split(/\s*(?:,|and|&)\s*/i).map(wdIndex).filter((x: number) => x >= 0);
   });
   // "every month on the 1st", "monthly on the 25th": the day of the month it falls on
   take(/\s(?:on\s+)?(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)(?:\s+of\s+(?:the|each|every)\s+month)?(?=\s)/i, (_m, d) => {

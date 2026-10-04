@@ -144,3 +144,16 @@ describe('repeats', () => {
     expect([rent.next, rent.today, rent.endsIn]).toEqual(['2026-11-01', undefined, undefined]);
   });
 });
+
+describe('money', () => {
+  it('amortizes to a monthly cost and lists upcoming charges', async () => {
+    const { monthlyCost, chargesBetween, repeatInfo } = await import('./repeats');
+    const yearly = T({ id: 'y', title: 'Domain', date: '2026-01-15', recurrence: { freq: 'yearly', interval: 1 }, cost: { amount: 120 } });
+    const weekly = T({ id: 'w', title: 'Meal kit', date: '2026-09-07', recurrence: { freq: 'weekly', interval: 1 }, cost: { amount: 10, autopay: true } });
+    expect(monthlyCost(yearly)).toBe(10);
+    expect(monthlyCost(weekly)).toBeCloseTo(43.48, 1);
+    const ch = chargesBetween(db(yearly, weekly), '2026-10-01', '2026-10-31');
+    expect(ch.map((c) => c.date)).toEqual(['2026-10-05', '2026-10-12', '2026-10-19', '2026-10-26']);
+    expect(repeatInfo(weekly, '2026-10-02').missed).toEqual([]); // auto-pay is never "missed"
+  });
+});

@@ -296,7 +296,7 @@ export function computeTrend(entities: Record<string, Entity>, range: TrendRange
   // left behind: only judged on days that are over
   for (const t of tasks) {
     if (t.recurrence) {
-      if (!t.date) continue;
+      if (!t.date || t.cost?.autopay) continue; // auto-pay never gets left behind
       const s0 = t.date > points[0]?.from ? t.date : points[0]?.from;
       const end = t.recurrence.until && t.recurrence.until < today ? addDays(t.recurrence.until, 1) : today;
       for (let d = s0; d && d < end; d = addDays(d, 1)) if (occursOn(t.recurrence, t.date, d) && !t.completions?.[d]) find(d) && find(d)!.left++;

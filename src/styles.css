@@ -1181,3 +1181,37 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .rp-alert.renew { background: #43230f; color: #fdba74; }
 }
+.cost-row { align-items: end; } .cost-row .autopay { padding-bottom: 8px; }
+
+/* repeats: bills & subscriptions */
+.money { display: grid; grid-template-columns: minmax(230px, 1fr) minmax(260px, 1.3fr) minmax(220px, 1fr); gap: 12px; margin-top: 12px; }
+@media (max-width: 1000px) { .money { grid-template-columns: 1fr 1fr; } .money-split { grid-column: span 2; } }
+.app.mobile .money { grid-template-columns: 1fr; } .app.mobile .money-split { grid-column: auto; }
+.money > * { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.money-total { background: linear-gradient(155deg, #134e4a, #0f766e 55%, #22c55e); color: #fff; border: 0; display: flex; flex-direction: column; }
+.mt-label { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.9; }
+.mt-cur { margin-left: auto; background: rgba(255, 255, 255, 0.16); color: #fff; border: 0; border-radius: 6px; font-size: 11px; padding: 2px 4px; }
+.mt-cur option { color: #000; }
+.mt-big { font-size: 38px; font-weight: 900; letter-spacing: -0.02em; margin-top: 8px; font-variant-numeric: tabular-nums; }
+.mt-sub { font-size: 13px; opacity: 0.85; margin-top: -2px; }
+.mt-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; margin-top: 10px; opacity: 0.95; }
+.mt-note { font-size: 11px; opacity: 0.7; margin-top: auto; padding-top: 10px; }
+.ms-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.ms-sum { font-weight: 800; font-variant-numeric: tabular-nums; color: #0f766e; }
+.ms-list { list-style: none; margin: 0; padding: 0; max-height: 210px; overflow: auto; }
+.ms-list li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 5px 4px; border-bottom: 1px dashed var(--line); cursor: pointer; border-radius: 4px; }
+.ms-list li:hover { background: var(--accent-soft); }
+.ms-date { width: 78px; color: var(--muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.ms-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-auto { color: #0f766e; flex-shrink: 0; }
+.ms-amt { font-weight: 700; font-variant-numeric: tabular-nums; }
+.money-split { display: flex; flex-direction: column; gap: 6px; }
+.mx-row { display: grid; grid-template-columns: minmax(0, 1fr) 70px auto; align-items: center; gap: 8px; font-size: 12.5px; cursor: pointer; }
+.mx-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mx-bar { height: 7px; background: var(--drop-bg); border-radius: 4px; overflow: hidden; }
+.mx-bar i { display: block; height: 100%; background: linear-gradient(90deg, #0f766e, #22c55e); border-radius: 4px; }
+.mx-amt { font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.money-hint { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-top: 10px; padding: 8px 12px; border: 1px dashed var(--line-strong); border-radius: 10px; }
+.rp-cost { font-size: 12.5px; }
+.rp-cost b { font-variant-numeric: tabular-nums; }
+.rp-auto { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; color: #0f766e; background: color-mix(in srgb, #0f766e 12%, var(--card)); border-radius: 99px; padding: 2px 8px; flex-shrink: 0; }

@@ -1,4 +1,4 @@
-import type { Entity, ISODate, Task } from '../types';
+import type { Entity, ISODate, Recurrence, Task } from '../types';
 import { addDays, diffDays } from './date';
 import { occursOn } from './recurrence';
 
@@ -56,6 +56,8 @@ export function repeatInfo(t: Task, today: ISODate): RepeatInfo {
     const s = t.completions?.[d];
     recent.push({ date: d, state: s === 'done' ? 'done' : s === 'dropped' ? 'dropped' : 'missed' });
   }
+  // auto-pay happens by itself: past occurrences count as done, never as missed
+  if (t.cost?.autopay) for (const x of recent) if (x.state === 'missed') x.state = 'done';
   const missed = t.allDay ? [] : recent.filter((x) => x.state === 'missed').map((x) => x.date);
   const done = recent.filter((x) => x.state === 'done').length;
   const rate = t.allDay || done + missed.length === 0 ? null : done / (done + missed.length);
@@ -83,3 +85,48 @@ export function repeatInfo(t: Task, today: ISODate): RepeatInfo {
     ended,
   };
 }
+
+// ---------- money ----------
+
+/** How many times a year this repeat happens (ignoring any end date). */
+export function perYear(r: Recurrence): number {
+  const iv = Math.max(1, r.interval || 1);
+  switch (r.freq) {
+    case 'daily':
+      return 365.25 / iv;
+    case 'weekly':
+      return ((365.25 / 7) * Math.max(1, r.byWeekday?.length ?? 1)) / iv;
+    case 'monthly':
+      return 12 / iv;
+    case 'yearly':
+      return 1 / iv;
+  }
+}
+
+/** The cost spread evenly over months: $120 a year → $10 a month. */
+export const monthlyCost = (t: Task) => (t.cost && t.recurrence ? (t.cost.amount * perYear(t.recurrence)) / 12 : 0);
+
+export interface Charge {
+  date: ISODate;
+  task: Task;
+  amount: number;
+}
+
+/** Every actual charge between two days (inclusive), in date order. */
+export function chargesBetween(entities: Record<string, Entity>, from: ISODate, to: ISODate): Charge[] {
+  const out: Charge[] = [];
+  for (const e of Object.values(entities)) {
+    if (e.type !== 'task' || e.deleted || !e.recurrence || !e.date || !e.cost?.amount) continue;
+    for (let d = from < e.date ? e.date : from; d <= to; d = addDays(d, 1)) {
+      const s = e.completions?.[d];
+      if (s !== 'deleted' && s !== 'moved' && s !== 'dropped' && occursOn(e.recurrence, e.date, d)) out.push({ date: d, task: e, amount: e.cost.amount });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
+}
+
+/** Bills still running (not ended) — the ones that make up the monthly total. */
+export const activeBills = (entities: Record<string, Entity>, today: ISODate) =>
+  Object.values(entities).filter(
+    (e): e is Task => e.type === 'task' && !e.deleted && !!e.recurrence && !!e.date && !!e.cost?.amount && !(e.recurrence.until && e.recurrence.until < today),
+  );

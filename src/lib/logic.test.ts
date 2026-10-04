@@ -87,6 +87,15 @@ describe('monthly day phrases', () => {
   });
 });
 
+describe('bills', () => {
+  const p = (s: string) => parseQuick(s, TODAY);
+  it('reads amounts and autopay', () => {
+    expect(p('Streaming $15.49 every month on the 12th autopay')).toMatchObject({ title: 'Streaming', cost: { amount: 15.49, autopay: true }, date: '2026-10-12' });
+    expect(p('Cloud storage 99 USD every year')).toMatchObject({ title: 'Cloud storage', cost: { amount: 99 } });
+    expect(p('Meal kit $60 every week on fri')).toMatchObject({ title: 'Meal kit', date: '2026-10-02', recurrence: { freq: 'weekly', byWeekday: [5] } });
+  });
+});
+
 describe('all-day events', () => {
   const p = (s: string) => parseQuick(s, TODAY);
   it('reads "all day" and "for N days"', () => {

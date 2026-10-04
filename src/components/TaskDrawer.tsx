@@ -9,6 +9,8 @@ import { cls } from '../lib/id';
 import { requestDelete, duplicateTask, getTask, projects, restoreVersion, setItemStatus, tasks, updateTask } from '../actions';
 import { Field, Segmented } from './ui';
 import { cancelAsk, enqueueAsk, hasQuestion, llmReady } from '../lib/llm';
+import { monthlyCost } from '../lib/repeats';
+import { fmtMoney } from '../lib/money';
 
 export function TaskDrawer({ today }: { today: ISODate }) {
   const selectedId = useStore((s) => s.ui.selectedId);
@@ -187,6 +189,7 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
           )}
           <div className="divider" />
           <RepeatField t={t} today={today} occDate={occDate} />
+          {t.recurrence && !t.allDay && <CostField t={t} />}
           {!t.allDay && (
             <div className="row2">
               <Field label="Hard deadline" hint={t.deadline ? relDay(t.deadline, today) : 'Escalates colour as it nears'}>
@@ -315,6 +318,35 @@ function repeatKey(r?: Recurrence): RepeatKey {
   if (r.freq === 'monthly' && r.interval === 1) return 'monthly';
   if (r.freq === 'yearly' && r.interval === 1) return 'yearly';
   return 'custom';
+}
+
+/** For bills and subscriptions: what each occurrence costs, and whether it pays itself. */
+function CostField({ t }: { t: Task }) {
+  const [v, setV] = useState(t.cost?.amount ? String(t.cost.amount) : '');
+  useEffect(() => setV(t.cost?.amount ? String(t.cost.amount) : ''), [t.id, t.cost?.amount]);
+  const save = (amount: number, autopay = t.cost?.autopay) =>
+    updateTask(t.id, { cost: amount || autopay ? { amount, ...(autopay ? { autopay: true } : {}) } : undefined }, `Cost of “${t.title}”`);
+  const per = monthlyCost(t);
+  return (
+    <div className="row2 cost-row">
+      <Field label="Cost each time" hint={per && t.recurrence?.freq !== 'monthly' ? `≈ ${fmtMoney(per)} a month` : 'Bills & subscriptions'}>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          placeholder="0.00"
+          value={v}
+          onChange={(e) => setV(e.target.value)}
+          onBlur={() => Number(v || 0) !== (t.cost?.amount ?? 0) && save(Number(v || 0))}
+        />
+      </Field>
+      <label className="check-row small autopay" title="Pays itself: never shows as missed, no need to tick it off">
+        <input type="checkbox" checked={!!t.cost?.autopay} onChange={(e) => save(Number(v || 0), e.target.checked)} />
+        Auto-pay
+      </label>
+    </div>
+  );
 }
 
 function RepeatField({ t, today, occDate }: { t: Task; today: ISODate; occDate?: ISODate }) {

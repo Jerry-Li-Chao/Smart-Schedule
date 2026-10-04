@@ -52,6 +52,8 @@ export interface Task extends Base {
   seriesId?: string;
   /** stays on its own day — not auto-carried to today (imported history). Cleared when you reschedule it. */
   stay?: boolean;
+  /** repeating bills and subscriptions: what each occurrence costs, and whether it pays itself */
+  cost?: { amount: number; autopay?: boolean };
   /** repeating tasks only: show a running number on each day (start = first day's number) */
   numbering?: { start: number };
   /** Answer from the local LLM when the task contains a "?" */
@@ -125,6 +127,8 @@ export interface Settings {
   llmModel: string;
   /** Short context sent with every AI question, e.g. where the user lives */
   llmAbout?: string;
+  /** ISO 4217 code used to show costs, e.g. USD */
+  currency?: string;
 }
 
 /** Something drawn in a day column. */
