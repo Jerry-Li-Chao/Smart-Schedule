@@ -217,6 +217,40 @@ D[i][j] = min( D[i-1][j-1] + (A[i] == B[j] ? 0 : 1),   // diagonal: keep or repl
         <p class="muted" style="margin:6px 0 0">Times measured with a plain JavaScript loop on a MacBook (10 million extrapolated); memory is 1,024 numbers × 4 bytes per task.</p>
     </div>
   </div>
+  <div class="grid2" style="margin-top:14px;align-items:start">
+    <div class="small">
+      <b>How many dimensions does an idea need?</b> It's tempting to think 1,024 dimensions = room for 1,024 ideas. It isn't, for two reasons:
+      <ul style="margin:6px 0;padding-left:18px">
+        <li><b>Nearly-perpendicular is enough.</b> Only 1,024 arrows can be <i>exactly</i> at right angles. But arrows whose every pair has a cosine between −ε and ε (“almost unrelated”) can number about <span class="mono">e<sup>c·ε²·d</sup></span> — exponential in the dimension <i>d</i>. Even 384 dimensions leave room for astronomically more directions than any language has concepts.</li>
+        <li><b>The Johnson–Lindenstrauss lemma</b> runs the same idea backwards: to keep the distances between <i>N</i> points accurate to within ε, about <span class="mono">log(N) / ε²</span> dimensions suffice. Room grows only with the <i>log</i> of the number of things, but with the <i>square</i> of the precision — extra dimensions mostly buy <b>finer distinctions</b>, not more things.</li>
+      </ul>
+      There <i>is</i> a proven ceiling, just not where you'd expect: Weller et al. (Google DeepMind, ICLR 2026) showed that with <i>d</i> dimensions, some combinations of “these k documents should be the top results” can't be produced by any single-vector model — and built a deliberately simple test (LIMIT) that state-of-the-art models fail. It bites on queries that combine many unrelated conditions, not on “teeth → dentist”.
+      <p style="margin:6px 0 0"><b>So which size?</b> No formula picks it — it's measured on benchmarks (MTEB). What's typical:</p>
+      <table style="margin:6px 0"><tbody>
+        <tr><td>one language, short texts</td><td>384–768 <span class="muted">(all-MiniLM 384, nomic-embed-text 768)</span></td></tr>
+        <tr><td>100+ languages</td><td>768–1,024 <span class="muted">(multilingual-e5-large, bge-m3: 1,024)</span></td></tr>
+        <tr><td>large hosted models</td><td>1,536–3,072 <span class="muted">(OpenAI text-embedding-3)</span></td></tr>
+      </tbody></table>
+      Many languages need more room mainly because they share <i>one</i> space (so “dentist” and “牙医” land together) — but model size and training data matter more than the vector length. And length is negotiable: models trained “Matryoshka-style” pack the most important information into the first dimensions, so OpenAI's text-embedding-3-large cut from 3,072 to 256 numbers still beats their previous 1,536-number model.
+    </div>
+    <div class="small">
+      <b>Why bge-m3?</b> What this planner needs from an embedding model:
+      <ol style="margin:6px 0;padding-left:18px">
+        <li><b>English <i>and</i> Chinese in one space</b> — tasks are written in both, and a search in one language should find tasks in the other. bge-m3 is trained on 100+ languages; measured here: <code>牙齿</code> ↔ <i>Call the dentist</i> 0.69 and <code>teeth</code> ↔ <i>看牙医</i> 0.71 — both above the 0.60 cut-off, while <i>Buy groceries</i> stays near 0.5.</li>
+        <li><b>Runs locally in Ollama</b> with one command (<code>ollama pull bge-m3</code>) — free, offline, nothing leaves the computer.</li>
+        <li><b>Widely used and well tested</b> (by BAAI, the Beijing Academy of AI; built on XLM-RoBERTa), with strong multilingual retrieval benchmarks.</li>
+      </ol>
+      The alternatives in Ollama, and why not:
+      <table style="margin:6px 0"><tbody>
+        <tr><td class="mono">all-minilm</td><td>tiny (384) and fast, but English only</td></tr>
+        <tr><td class="mono">nomic-embed-text</td><td>popular (768), English-focused</td></tr>
+        <tr><td class="mono">mxbai-embed-large</td><td>strong (1,024), English-focused</td></tr>
+        <tr><td class="mono">nomic-embed-text-v2-moe</td><td>multilingual and smaller — a reasonable alternative worth measuring</td></tr>
+      </tbody></table>
+      The costs we accepted: a 1.2 GB download, and vectors of 1,024 numbers (4 KB per task) — at planner size that's ~3 ms per search, so it didn't matter. bge-m3 can also produce keyword-style (“sparse”) and per-word (“multi-vector”) outputs; we only use its ordinary (“dense”) vector, since part 1 already covers keywords. Honest note: we didn't benchmark the alternatives — the cut-off of 0.60 and every number on this page were measured on bge-m3, and switching models means re-measuring them.
+      <p class="muted" style="margin:8px 0 0">Sources: <a href="https://arxiv.org/abs/2508.21038">Weller et al., limits of embedding retrieval</a> · <a href="https://en.wikipedia.org/wiki/Johnson%E2%80%93Lindenstrauss_lemma">Johnson–Lindenstrauss lemma</a> · <a href="https://people.cs.umass.edu/~cmusco/CS514F22/slides/lecture14/lecture14Compressed.pdf">nearly orthogonal vectors (UMass lecture)</a> · <a href="https://www.pinecone.io/learn/openai-embeddings-v3/">OpenAI embeddings v3 / Matryoshka</a> · <a href="https://build.nvidia.com/baai/bge-m3/modelcard">bge-m3 model card</a> · <a href="https://registry.ollama.ai/library/nomic-embed-text-v2-moe">nomic-embed-text-v2-moe</a></p>
+    </div>
+  </div>
 </div>
 
 <div class="card">
