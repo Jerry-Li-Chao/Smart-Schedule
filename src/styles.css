@@ -1328,3 +1328,7 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .swatch.on { border-color: var(--text); }
 .swatch.none { --tc: var(--line-strong); background: var(--card); position: relative; overflow: hidden; }
 .swatch.none::after { content: ''; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: var(--line-strong); transform: rotate(45deg); }
+
+.repeat-ends { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
+.repeat-ends input { width: auto; }
+.repeat-ends .field-hint { flex-basis: 100%; margin: 0; }

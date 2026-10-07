@@ -320,7 +320,6 @@ type RepeatKey = 'none' | 'daily' | 'weekdays' | 'weekly' | 'biweekly' | 'monthl
 function repeatKey(r?: Recurrence): RepeatKey {
   if (!r) return 'none';
   const wd = r.byWeekday ?? [];
-  if (r.until) return 'custom';
   if (r.freq === 'daily' && r.interval === 1) return 'daily';
   if (r.freq === 'weekly' && r.interval === 1 && wd.length === 5 && [1, 2, 3, 4, 5].every((x) => wd.includes(x))) return 'weekdays';
   if (r.freq === 'weekly' && wd.length <= 1) return r.interval === 1 ? 'weekly' : r.interval === 2 ? 'biweekly' : 'custom';
@@ -380,7 +379,8 @@ function RepeatField({ t, today, occDate }: { t: Task; today: ISODate; occDate?:
             monthly: { freq: 'monthly', interval: 1 },
             yearly: { freq: 'yearly', interval: 1 },
           };
-          if (v !== 'custom') set(map[v]);
+          const next = map[v];
+          if (v !== 'custom') set(next && r?.until ? { ...next, until: r.until } : next); // keep the end date
           else if (!r) set({ freq: 'weekly', interval: 1 });
         }}
       >
@@ -415,8 +415,22 @@ function RepeatField({ t, today, occDate }: { t: Task; today: ISODate; occDate?:
               })}
             </div>
           )}
-          <span>until</span>
-          <input type="date" value={r.until ?? ''} onChange={(e) => set({ ...r, until: e.target.value || undefined })} />
+        </div>
+      )}
+      {r && t.date && (
+        <div className="repeat-ends">
+          <span>Ends</span>
+          <input type="date" value={r.until ?? ''} min={t.date} onChange={(e) => set({ ...r, until: e.target.value || undefined })} />
+          {r.until ? (
+            <button className="link-btn" onClick={() => set({ ...r, until: undefined })}>
+              Keep repeating
+            </button>
+          ) : (
+            <button className="link-btn" title="Stop after today — past days and charges are kept, and it moves to Past repeats" onClick={() => set({ ...r, until: today < t.date! ? t.date! : today })}>
+              End today
+            </button>
+          )}
+          <span className="field-hint">{r.until ? (r.until < today ? 'Ended — kept in Past repeats with its history' : 'Stops after this day; its history is kept') : 'Never — or pick the last day'}</span>
         </div>
       )}
       {r && <NumberingControls t={t} occDate={occDate} />}
