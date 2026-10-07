@@ -11,6 +11,7 @@ import { Field, Segmented } from './ui';
 import { cancelAsk, enqueueAsk, hasQuestion, llmReady } from '../lib/llm';
 import { monthlyCost } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
+import { TASK_COLORS, TASK_COLOR_KEYS } from '../lib/taskColors';
 
 export function TaskDrawer({ today }: { today: ISODate }) {
   const selectedId = useStore((s) => s.ui.selectedId);
@@ -131,6 +132,14 @@ function DrawerBody({ t, occDate, today }: { t: Task; occDate?: ISODate; today: 
             <div className="field-hint">
               {eff.reason ? <span className="urgent-text">Showing as {eff.level} because it’s {eff.reason}.</span> : IMPORTANCE_HELP[t.importance].hint}
             </div>
+            <div className="sub-label">Colour</div>
+            <div className="swatches">
+              <button className={cls('swatch none', !t.color && 'on')} title="No colour — the card shows its priority colour" aria-label="No colour" onClick={() => up({ color: undefined }, `“${t.title}”: colour removed`)} />
+              {TASK_COLOR_KEYS.map((c) => (
+                <button key={c} className={cls('swatch', `tc-${c}`, t.color === c && 'on')} title={TASK_COLORS[c].label} aria-label={TASK_COLORS[c].label} onClick={() => up({ color: c }, `“${t.title}” → ${TASK_COLORS[c].label.toLowerCase()}`)} />
+              ))}
+            </div>
+            <div className="field-hint">Your own label. It tints the card while the task is open; the bars still show the priority.</div>
           </Section>
         )}
 

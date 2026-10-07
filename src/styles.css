@@ -472,6 +472,7 @@ kbd { font: 10px ui-monospace, Menlo, monospace; border: 1px solid var(--line-st
 .sw.yellow { background: #ffff00; border: 1px solid #ddd; }
 .sw.green { background: #00ff00; }
 .sw.grey { background: #b7b7b7; }
+.sw.orange { background: #ff9900; }
 
 /* phone */
 .tabbar {
@@ -1312,3 +1313,18 @@ body.boxing, body.boxing * { user-select: none !important; cursor: crosshair !im
 .caret { display: inline-block; width: 7px; height: 14px; margin-left: 2px; background: #8b5cf6; vertical-align: -2px; animation: blink 0.9s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
 .ans-foot { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+/* ---------- task colours (your own labels) ---------- */
+.card.tc-orange, .swatch.tc-orange { --tc: #e8913a; }
+.card.tc-blue, .swatch.tc-blue { --tc: #3b82f6; }
+.card.tc-teal, .swatch.tc-teal { --tc: #14a38b; }
+.card.tc-purple, .swatch.tc-purple { --tc: #8b5cf6; }
+.card.tc-pink, .swatch.tc-pink { --tc: #e0518f; }
+.card.tc-brown, .swatch.tc-brown { --tc: #9a6b44; }
+.card.tc { background: color-mix(in srgb, var(--tc) 17%, var(--card)); border-color: color-mix(in srgb, var(--tc) 35%, transparent); border-left-color: var(--tc); }
+.swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid transparent; background: color-mix(in srgb, var(--tc) 30%, var(--card)); box-shadow: inset 0 0 0 2px var(--tc); cursor: pointer; padding: 0; }
+.swatch:hover { transform: scale(1.1); }
+.swatch.on { border-color: var(--text); }
+.swatch.none { --tc: var(--line-strong); background: var(--card); position: relative; overflow: hidden; }
+.swatch.none::after { content: ''; position: absolute; left: 50%; top: 2px; bottom: 2px; width: 2px; background: var(--line-strong); transform: rotate(45deg); }

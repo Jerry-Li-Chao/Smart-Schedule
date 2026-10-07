@@ -22,6 +22,9 @@ interface Base {
   device?: string;
 }
 
+/** Colours you can give a task. Red, yellow, green and grey are left out — they already mean must, should, done and obsolete. */
+export type TaskColor = 'orange' | 'blue' | 'teal' | 'purple' | 'pink' | 'brown';
+
 export interface Task extends Base {
   type: 'task';
   title: string;
@@ -36,6 +39,8 @@ export interface Task extends Base {
   time?: string;
   importance: Importance;
   status: Status;
+  /** your own colour label; tints the card (and the sheet cell) while the task is open */
+  color?: TaskColor;
   doneAt?: number;
   deadline?: ISODate;
   /** Local datetime YYYY-MM-DDTHH:MM */

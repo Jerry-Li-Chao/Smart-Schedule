@@ -44,8 +44,9 @@ Data lives in `~/Library/Application Support/Planner/data.json`. A dated copy is
      only for days from the import's start date; a backup copy of the tab is saved first).
      This also works **without any setup** from a downloaded file: Google Sheets → File → Download → Microsoft Excel (.xlsx).
 
-   The import It reads row 1 as dates and colours as
-   red = must, yellow = should, green = done, grey = obsolete, and merges copies marked “(cont.)” into one task. Your original tab is only read, never changed.
+   The import reads row 1 as dates and colours as
+   red = must, orange or yellow = should, green = done, any grey = obsolete, white = could; any
+   other colour (purple, blue…) becomes a could task that keeps the colour, with a note. It merges copies marked “(cont.)” into one task. Your original tab is only read, never changed.
 
 The script adds three tabs and leaves your others alone:
 - `_app_data` (hidden): one row per task, which is the synced data.

@@ -15,7 +15,7 @@
  * Bump this whenever the script changes in a way the app relies on. The app compares it with the
  * copy it ships with and asks you to update the deployed script when this one is older.
  */
-var SCRIPT_VERSION = 2;
+var SCRIPT_VERSION = 3;
 
 var DATA_SHEET = '_app_data';
 var HIST_SHEET = '_app_history';
@@ -251,6 +251,8 @@ function readLegacy_(name) {
 // ---------------------------------------------------------------- read-only calendar mirror
 
 var COLORS = { must: '#ff0000', should: '#ffff00', could: '#ffffff', done: '#00ff00', dropped: '#b7b7b7', event: '#e4d7fb' };
+/** your own task colours (same soft tints as the app); shown while a task is open */
+var TASK_COLORS = { orange: '#fde7cf', blue: '#dbe8fb', teal: '#d5f0ec', purple: '#ece3fb', pink: '#fadbe8', brown: '#ede2d6' };
 
 function renderCalendar_(rows) {
   var ss = SpreadsheetApp.getActive();
@@ -370,6 +372,8 @@ function cellText_(it) {
 }
 function cellColor_(it) {
   if (it.t.allDay) return COLORS.event;
+  var open = it.status !== 'done' && it.status !== 'dropped';
+  if (open && it.t.color && TASK_COLORS[it.t.color]) return TASK_COLORS[it.t.color];
   return it.status === 'done' ? COLORS.done : it.status === 'dropped' ? COLORS.dropped : COLORS[it.t.importance] || '#ffffff';
 }
 

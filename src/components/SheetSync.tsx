@@ -296,8 +296,8 @@ function ImportCard({ ping, onLinked }: { ping: Ping | null; onLinked: (l: Linke
       </div>
       <h3>Bring my existing Google Sheet into the app</h3>
       <p className="muted small">
-        Row 1 = dates, each cell = a task. Colours become: <span className="sw red" /> must · <span className="sw yellow" /> should · <span className="sw green" /> done ·{' '}
-        <span className="sw grey" /> obsolete · other could. Copies marked “(cont.)” merge into one task. Importing only reads your tab — unless you choose to keep it linked below.
+        Row 1 = dates, each cell = a task. Colours become: <span className="sw red" /> must · <span className="sw orange" /> <span className="sw yellow" /> should · <span className="sw green" /> done ·{' '}
+        <span className="sw grey" /> any grey obsolete · white could. Any other colour (purple, blue…) becomes a could task that keeps that colour, with a note saying so. Copies marked “(cont.)” merge into one task. Importing only reads your tab — unless you choose to keep it linked below.
       </p>
       <Segmented<Source>
         className="full"

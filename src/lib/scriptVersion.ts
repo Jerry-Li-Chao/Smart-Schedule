@@ -11,6 +11,7 @@ export const SCRIPT_CHANGES: Record<number, string[]> = {
     'Keeping an imported tab linked, so the app’s changes are written back into it',
     'Tells the app which version it is, so you get this reminder next time',
   ],
+  3: ['Tasks you gave a colour show that colour in the Google Sheet while they’re open'],
 };
 
 /** Changes the deployed script is missing (empty when it's up to date or not connected yet). */

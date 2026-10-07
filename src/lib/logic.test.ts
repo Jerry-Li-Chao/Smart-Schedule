@@ -158,7 +158,16 @@ describe('legacy import', () => {
     expect(classifyColor('#b7b7b7')).toEqual({ importance: 'could', status: 'dropped' });
     expect(classifyColor('#d9d9d9')?.status).toBe('dropped');
     expect(classifyColor('#ffffff')).toEqual({ importance: 'could', status: 'open' });
-    expect(classifyColor('#e6b8f9')).toEqual({ importance: 'could', status: 'open' }); // purple class blocks
+    expect(classifyColor('#f3f3f3')?.status).toBe('dropped'); // even the faintest grey
+    expect(classifyColor('#000000')?.status).toBe('dropped');
+    // orange has no level of its own: it rounds down to should
+    for (const orange of ['#ff9900', '#f6b26b', '#f9cb9c', '#fce5cd', '#e69138']) expect(classifyColor(orange)).toEqual({ importance: 'should', status: 'open' });
+    // colours with no meaning: a could task that keeps the colour as a label
+    expect(classifyColor('#e6b8f9')).toEqual({ importance: 'could', status: 'open', other: { color: 'purple', name: 'purple', hex: '#e6b8f9' } });
+    expect(classifyColor('#cfe2f3')?.other?.color).toBe('blue');
+    expect(classifyColor('#00ffff')?.other?.color).toBe('teal');
+    expect(classifyColor('#ead1dc')?.other?.color).toBe('pink');
+    expect(classifyColor('#ffffff')?.other).toBeUndefined();
   });
 
   it('infers years across Dec → Jan', () => {

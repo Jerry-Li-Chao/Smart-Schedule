@@ -76,7 +76,7 @@ export const ItemCard = memo(function ItemCard({ item, today, project }: { item:
 
   return (
     <div
-      className={cls('card', `lvl-${level}`, `st-${status}`, selected && 'selected', inMulti && 'multi', missed && 'missed')}
+      className={cls('card', `lvl-${level}`, `st-${status}`, t.color && !closed && `tc tc-${t.color}`, selected && 'selected', inMulti && 'multi', missed && 'missed')}
       data-card
       data-key={itemKey(item)}
       draggable={!editing}

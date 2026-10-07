@@ -1,11 +1,13 @@
-import type { ISODate, Importance, Status, Task } from '../types';
+import type { ISODate, Importance, Status, Task, TaskColor } from '../types';
 import { fromISO, toISO } from './date';
 import { extractTime } from './parse';
 import { hashId } from './id';
 
 /**
  * Converts the old "one column per day, colour = meaning" sheet into tasks.
- * red → must · yellow → should · green → done · grey → obsolete · anything else → could.
+ * red → must · orange, yellow → should · green → done · grey (any shade) → obsolete · white → could.
+ * Any other colour (purple, blue, pink…) has no meaning in the planner: it becomes a could task that keeps
+ * the nearest palette colour, with a note saying which colour the cell had.
  */
 export interface LegacySheet {
   name: string;
@@ -14,7 +16,14 @@ export interface LegacySheet {
   bgs: string[][]; // rows 2..n, hex backgrounds
 }
 
-export function classifyColor(hex: string): { importance: Importance; status: Status } | null {
+export interface ColorKind {
+  importance: Importance;
+  status: Status;
+  /** set for colours with no planner meaning: the cell's colour, kept as a label */
+  other?: { color: TaskColor; name: string; hex: string };
+}
+
+export function classifyColor(hex: string): ColorKind | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
   if (!m) return { importance: 'could', status: 'open' };
   const n = parseInt(m[1], 16);
@@ -33,9 +42,11 @@ export function classifyColor(hex: string): { importance: Importance; status: St
   else h = (r - g) / (max - min) + 4;
   h = (h * 60 + 360) % 360;
   if (h < 22 || h >= 335) return { importance: 'must', status: 'open' };
-  if (h >= 40 && h < 68) return { importance: 'should', status: 'open' };
+  // orange sits between yellow and red; there's no level for it, so it rounds down to should
+  if (h >= 22 && h < 68) return { importance: 'should', status: 'open' };
   if (h >= 68 && h < 170) return { importance: 'could', status: 'done' };
-  return { importance: 'could', status: 'open' };
+  const [color, name]: [TaskColor, string] = h < 200 ? ['teal', 'cyan'] : h < 250 ? ['blue', 'blue'] : h < 300 ? ['purple', 'purple'] : ['pink', 'magenta'];
+  return { importance: 'could', status: 'open', other: { color, name, hex: '#' + m[1].toLowerCase() } };
 }
 
 /** "9/28", "9/28/2026", "2026-09-28", "Mon 9/28" → ISO, inferring the year as columns advance. */
@@ -115,7 +126,8 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
         order: r,
         createdAt: now,
         updatedAt: now,
-        notes: undefined,
+        notes: kind.other ? `Imported colour: ${kind.other.name} (${kind.other.hex})` : undefined,
+        color: kind.other?.color,
       };
       byTitle.set(key, t); // registered even when skipped, so its "(cont.)" copies are skipped too
       if (!opts.existing.has(id)) out.push(t);
