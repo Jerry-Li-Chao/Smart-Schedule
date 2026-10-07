@@ -12,6 +12,7 @@ export const SCRIPT_CHANGES: Record<number, string[]> = {
     'Tells the app which version it is, so you get this reminder next time',
   ],
   3: ['Tasks you gave a colour show that colour in the Google Sheet while they’re open'],
+  4: ['Importing reads cells merged across several days, so they come in as multi-day events'],
 };
 
 /** Changes the deployed script is missing (empty when it's up to date or not connected yet). */

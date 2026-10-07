@@ -206,6 +206,32 @@ describe('legacy import', () => {
     expect(again).toHaveLength(0);
   });
 
+  it('imports a block merged across days as one multi-day all-day event', () => {
+    const sheet = {
+      name: '2026 Planner',
+      header: ['10/5', '10/6', '10/7', '10/8', '10/9'],
+      cells: [
+        ['Vacation', '', '', '', 'Back home'],
+        ['Call the bank', '', '', '', ''],
+      ],
+      bgs: [
+        ['#e6b8f9', '#e6b8f9', '#e6b8f9', '#e6b8f9', '#ffffff'],
+        ['#ff0000', '#ffffff', '#ffffff', '#ffffff', '#ffffff'],
+      ],
+      spans: [{ r: 0, c: 0, cols: 4 }],
+    };
+    const out = legacyToTasks(sheet, { from: '2026-09-01', today: TODAY, oldUnfinished: 'keep', existing: new Set() });
+    const trip = out.find((t) => t.title === 'Vacation')!;
+    expect(trip).toMatchObject({ allDay: true, date: '2026-10-05', endDate: '2026-10-08', status: 'open' });
+    expect(trip.notes).toContain('purple');
+    expect(out.filter((t) => t.title === 'Vacation')).toHaveLength(1);
+    expect(out.find((t) => t.title === 'Back home')?.allDay).toBeUndefined(); // the column after the block is normal
+    expect(out.find((t) => t.title === 'Call the bank')?.allDay).toBeUndefined();
+    // the import's end date cuts the block short
+    const cut = legacyToTasks(sheet, { from: '2026-09-01', to: '2026-10-06', today: TODAY, oldUnfinished: 'keep', existing: new Set() });
+    expect(cut.find((t) => t.title === 'Vacation')).toMatchObject({ date: '2026-10-05', endDate: '2026-10-06' });
+  });
+
   it('extractTime only strips a leading time', () => {
     expect(extractTime('12:15PM Dentist checkup')).toEqual({ title: 'Dentist checkup', time: '12:15' });
     expect(extractTime('Read a chapter')).toEqual({ title: 'Read a chapter' });

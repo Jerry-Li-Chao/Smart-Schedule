@@ -46,7 +46,8 @@ Data lives in `~/Library/Application Support/Planner/data.json`. A dated copy is
 
    The import reads row 1 as dates and colours as
    red = must, orange or yellow = should, green = done, any grey = obsolete, white = could; any
-   other colour (purple, blue…) becomes a could task that keeps the colour, with a note. It merges copies marked “(cont.)” into one task. Your original tab is only read, never changed.
+   other colour (purple, blue…) becomes a could task that keeps the colour, with a note. A cell merged
+   across several day columns becomes one multi-day all-day event. It merges copies marked “(cont.)” into one task. Your original tab is only read, never changed.
 
 The script adds three tabs and leaves your others alone:
 - `_app_data` (hidden): one row per task, which is the synced data.

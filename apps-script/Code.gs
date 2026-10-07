@@ -15,7 +15,7 @@
  * Bump this whenever the script changes in a way the app relies on. The app compares it with the
  * copy it ships with and asks you to update the deployed script when this one is older.
  */
-var SCRIPT_VERSION = 3;
+var SCRIPT_VERSION = 4;
 
 var DATA_SHEET = '_app_data';
 var HIST_SHEET = '_app_history';
@@ -245,7 +245,11 @@ function readLegacy_(name) {
   var range = sh.getDataRange();
   var values = range.getDisplayValues();
   var bgs = range.getBackgrounds();
-  return { name: name, header: values[0] || [], cells: values.slice(1), bgs: bgs.slice(1) };
+  // blocks merged across several day columns (multi-day events); rows counted from row 2
+  var spans = range.getMergedRanges()
+    .filter(function (m) { return m.getRow() > 1 && m.getNumColumns() > 1; })
+    .map(function (m) { return { r: m.getRow() - 2, c: m.getColumn() - 1, cols: m.getNumColumns() }; });
+  return { name: name, header: values[0] || [], cells: values.slice(1), bgs: bgs.slice(1), spans: spans };
 }
 
 // ---------------------------------------------------------------- read-only calendar mirror

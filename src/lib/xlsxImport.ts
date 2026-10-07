@@ -23,6 +23,10 @@ export async function readXlsx(file: File): Promise<LegacySheet[]> {
       rows.push(row);
       bgs.push(bg);
     }
-    return { name, header: rows[0] ?? [], cells: rows.slice(1), bgs: bgs.slice(1) };
+    // horizontal merges below the header row: a block spanning several day columns
+    const spans = ((ws['!merges'] ?? []) as { s: { r: number; c: number }; e: { r: number; c: number } }[])
+      .filter((m) => m.s.r > range.s.r && m.e.c > m.s.c)
+      .map((m) => ({ r: m.s.r - range.s.r - 1, c: m.s.c - range.s.c, cols: m.e.c - m.s.c + 1 }));
+    return { name, header: rows[0] ?? [], cells: rows.slice(1), bgs: bgs.slice(1), spans };
   });
 }

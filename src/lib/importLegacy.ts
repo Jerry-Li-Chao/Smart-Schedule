@@ -14,6 +14,8 @@ export interface LegacySheet {
   header: string[]; // display values of row 1
   cells: string[][]; // rows 2..n, display values
   bgs: string[][]; // rows 2..n, hex backgrounds
+  /** cells merged across several day columns: row (0 = row 2), first column, number of columns */
+  spans?: { r: number; c: number; cols: number }[];
 }
 
 export interface ColorKind {
@@ -89,6 +91,7 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
   const out: Task[] = [];
   const byTitle = new Map<string, Task>(); // for merging "(cont.)" continuations
   const now = Date.now();
+  const spanAt = new Map((sheet.spans ?? []).filter((s) => s.cols > 1).map((s) => [`${s.r}|${s.c}`, s.cols]));
 
   dates.forEach((date, col) => {
     if (!date || date < opts.from || (opts.to && date > opts.to)) return;
@@ -97,6 +100,33 @@ export function legacyToTasks(sheet: LegacySheet, opts: ImportOptions): Task[] {
       if (!raw) return;
       const kind = classifyColor(sheet.bgs[r]?.[col] ?? '#ffffff');
       if (!kind) return;
+      // a block merged across several days = a multi-day all-day event (a trip, a holiday, a course week)
+      const cols = spanAt.get(`${r}|${col}`);
+      if (cols) {
+        const covered = dates.slice(col, col + cols).filter((d): d is ISODate => !!d && (!opts.to || d <= opts.to));
+        const end = covered[covered.length - 1];
+        if (end && end > date) {
+          const id = hashId('t_imp', `${sheet.name}|${date}|${r}|${raw}`);
+          const { title } = extractTime(raw.replace(CONT_RE, ''));
+          const ev: Task = {
+            type: 'task',
+            id,
+            title,
+            date,
+            endDate: end,
+            allDay: true,
+            firstScheduled: date,
+            importance: 'could',
+            status: 'open',
+            order: r,
+            createdAt: now,
+            updatedAt: now,
+            notes: kind.other ? `Imported colour: ${kind.other.name} (${kind.other.hex})` : undefined,
+          };
+          if (!opts.existing.has(id)) out.push(ev);
+          return;
+        }
+      }
       const isCont = CONT_RE.test(raw);
       const { title, time } = extractTime(raw.replace(CONT_RE, ''));
       const key = title.toLowerCase();

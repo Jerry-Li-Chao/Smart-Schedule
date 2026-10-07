@@ -33,6 +33,7 @@ function fakeGoogle() {
           getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => s.data[r - 1 + i]?.[c - 1 + j] ?? '')),
           getDisplayValues: () => range.getValues().map((row) => row.map(String)),
           getBackgrounds: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => s.bg[r - 1 + i]?.[c - 1 + j] ?? '#ffffff')),
+          getMergedRanges: () => (s.merges ?? []).map(([mr, mc, mn]) => ({ getRow: () => mr, getColumn: () => mc, getNumColumns: () => mn })),
           setBackgrounds(v) {
             v.forEach((row, i) => row.forEach((val, j) => { s.bg[r - 1 + i] ??= []; s.bg[r - 1 + i][c - 1 + j] = val; }));
             return proxy;
@@ -137,7 +138,11 @@ legacy.data = [
   ['', '', 'another stale', ''],
 ];
 legacy.bg = [[], ['#00ff00', '#00ff00', '#ff0000', '#ffffff'], ['', '', '#ffff00', '']];
-let res = call({ action: 'link', sheet: '2026 Planner', from: '2026-10-01' });
+legacy.merges = [[2, 1, 2]]; // "old note" merged across 9/29–9/30 (row, column, width)
+let res = call({ action: 'legacy', sheet: '2026 Planner' });
+assert.deepEqual(res.sheet.spans, [{ r: 0, c: 0, cols: 2 }], 'merged blocks are reported for import');
+legacy.merges = [];
+res = call({ action: 'link', sheet: '2026 Planner', from: '2026-10-01' });
 assert.equal(res.ok, true, res.error);
 assert.ok(g.sheets.get('2026 Planner (backup before Planner)'), 'backup copy made');
 assert.deepEqual(g.sheets.get('2026 Planner (backup before Planner)').data[1], ['old note', 'Pay day', 'stale cell', '']);
