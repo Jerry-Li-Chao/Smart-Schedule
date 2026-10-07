@@ -59,17 +59,8 @@ export interface Task extends Base {
   seriesId?: string;
   /** stays on its own day — not auto-carried to today (imported history). Cleared when you reschedule it. */
   stay?: boolean;
-  /** repeating bills and subscriptions: what each occurrence costs, and whether it pays itself.
-   *  `charged` = what was actually billed on a particular day, when it differs (a prorated upgrade). */
-  cost?: { amount: number; autopay?: boolean; charged?: Record<ISODate, number> };
-  /**
-   * A subscription that changes over time is a chain of periods: each period is its own repeat (own
-   * start, end, price), and every period after the first points at the first one's id. Gaps between
-   * periods = paused. No chainId = a chain of one.
-   */
-  chainId?: string;
-  /** the plan's name for this period, e.g. "Pro" */
-  plan?: string;
+  /** repeating bills and subscriptions: what each occurrence costs, and whether it pays itself */
+  cost?: { amount: number; autopay?: boolean };
   /** repeating tasks only: show a running number on each day (start = first day's number) */
   numbering?: { start: number };
   /** Answer from the local LLM when the task contains a "?" */

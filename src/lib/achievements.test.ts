@@ -158,48 +158,6 @@ describe('money', () => {
   });
 });
 
-describe('subscription chains', () => {
-  // $20/mo from Jan 1 → $200 from Feb 15 (billed $180 that day) → paused Apr 14 → $20 again from May 3
-  const plan = () =>
-    db(
-      T({ id: 'a1', title: 'AI assistant', date: '2026-01-01', recurrence: { freq: 'monthly', interval: 1, until: '2026-02-14' }, cost: { amount: 20 } }),
-      T({ id: 'a2', chainId: 'a1', plan: 'Max', title: 'AI assistant', date: '2026-02-15', recurrence: { freq: 'monthly', interval: 1, until: '2026-04-14' }, cost: { amount: 200, charged: { '2026-02-15': 180 } } }),
-      T({ id: 'a3', chainId: 'a1', title: 'AI assistant', date: '2026-05-03', recurrence: { freq: 'monthly', interval: 1 }, cost: { amount: 20 } }),
-    );
-  it('groups periods, finds the current one, and counts it once', async () => {
-    const { chains, activeBills, repeatInfos, monthlyCost } = await import('./repeats');
-    const c = chains(plan(), '2026-10-02').get('a1')!;
-    expect(c.periods.map((p) => p.id)).toEqual(['a1', 'a2', 'a3']);
-    expect([c.current?.id, c.upcoming, c.paused]).toEqual(['a3', undefined, false]);
-    expect(activeBills(plan(), '2026-10-02').map((t) => t.id)).toEqual(['a3']);
-    expect(repeatInfos(plan(), '2026-10-02').map((r) => r.task.id)).toEqual(['a3']); // one card
-    expect(monthlyCost(activeBills(plan(), '2026-10-02')[0])).toBe(20);
-    // in the gap it's paused
-    expect(chains(plan(), '2026-04-20').get('a1')).toMatchObject({ paused: false, upcoming: { id: 'a3' } });
-    expect(chains(plan(), '2026-04-20').get('a1')!.current).toBeUndefined();
-  });
-  it('adds up what was really charged: each period at its own price, one-offs, nothing in the gap', async () => {
-    const { chains, chainSpent, chargesBetween } = await import('./repeats');
-    const { periods } = chains(plan(), '2026-10-02').get('a1')!;
-    // Jan 1, Feb 1 at $20 · Feb 15 at $180 (one-off), Mar 15 at $200 · Apr 14 – May 2 nothing · May 3 … Oct 3? no: up to Oct 2 → May–Sep 3rd = 5 × $20
-    expect(chainSpent(periods, '2026-01-01', '2026-10-02')).toBe(20 + 20 + 180 + 200 + 5 * 20);
-    expect(chainSpent(periods, '2026-04-01', '2026-04-30')).toBe(0);
-    expect(chargesBetween(plan(), '2026-02-01', '2026-03-31').map((c) => [c.date, c.amount])).toEqual([
-      ['2026-02-01', 20],
-      ['2026-02-15', 180],
-      ['2026-03-15', 200],
-    ]);
-  });
-  it('a paused chain shows once in past repeats, with all its periods', async () => {
-    const { pastRepeats } = await import('./repeats');
-    const ents = plan();
-    delete ents.a3;
-    const list = pastRepeats(ents, '2026-10-02');
-    expect(list).toHaveLength(1);
-    expect([list[0].from, list[0].to, list[0].periods.length]).toEqual(['2026-01-01', '2026-04-14', 2]);
-  });
-});
-
 describe('past repeats', () => {
   it('keeps ended and deleted repeats, nudges when the season comes back', async () => {
     const { pastRepeats } = await import('./repeats');
