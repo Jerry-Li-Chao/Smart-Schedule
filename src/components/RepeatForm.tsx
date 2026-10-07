@@ -7,7 +7,7 @@ import { describeRecurrence } from '../lib/recurrence';
 import { monthlyCost } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
-import { createTask, resubscribe } from '../actions';
+import { createTask } from '../actions';
 import { Field, Segmented } from './ui';
 
 const UNITS: { freq: Recurrence['freq']; one: string; many: string }[] = [
@@ -24,10 +24,7 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
   // "Add again" from history: same details, starting on `from.start`, running for the same stretch
   const r0 = from?.task.recurrence;
   const s0 = from?.start ?? today;
-  // resubscribing to a bill that ended joins its history (same chain) instead of starting a new one
-  const link = !!from && !from.task.deleted && !!from.task.cost;
-  // a seasonal "add again" runs for the same stretch as last time; a resubscription is open-ended
-  const span = r0?.until && from && !link ? diffDays(from.task.date!, r0.until) : null;
+  const span = r0?.until && from ? diffDays(from.task.date!, r0.until) : null;
   const [title, setTitle] = useState(from?.task.title ?? '');
   const [freq, setFreq] = useState<Recurrence['freq']>(r0?.freq ?? 'monthly');
   const [interval, setInterval] = useState(r0?.interval ?? 1);
@@ -37,7 +34,6 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
   const [amount, setAmount] = useState(from?.task.cost?.amount ? String(from.task.cost.amount) : '');
   const [autopay, setAutopay] = useState(!!from?.task.cost?.autopay);
   const [importance, setImportance] = useState<Importance>(from?.task.importance ?? defImp);
-  const [plan, setPlan] = useState(from?.task.plan ?? '');
 
   const recurrence: Recurrence = useMemo(
     () => ({ freq, interval: Math.max(1, interval || 1), ...(freq === 'weekly' && days.length ? { byWeekday: [...days].sort() } : {}), ...(until ? { until } : {}) }),
@@ -49,11 +45,6 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
 
   const save = () => {
     if (!ok) return;
-    if (link) {
-      resubscribe({ ...from!.task, title: title.trim(), importance, cost: { amount: cost, ...(autopay ? { autopay: true } : {}) } }, { from: start, amount: cost, plan, recurrence });
-      onDone();
-      return;
-    }
     createTask({
       title: title.trim(),
       date: start,
@@ -69,7 +60,7 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
   return (
     <div className="rp-form" onKeyDown={(e) => (e.key === 'Escape' ? onDone() : e.key === 'Enter' && (e.metaKey || e.ctrlKey) && save())}>
       <div className="rf-head">
-        <b>{link ? `Resubscribe to “${from!.task.title}”` : from ? `Add “${from.task.title}” again` : 'New repeat'}</b>
+        <b>{from ? `Add “${from.task.title}” again` : 'New repeat'}</b>
         <span className="spacer" />
         <button className="icon-btn" title="Close (Esc)" onClick={onDone}>
           <X size={15} />
@@ -117,11 +108,6 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
         <Field label="Cost each time" hint={perMonth && (freq !== 'monthly' || interval > 1) ? `≈ ${fmtMoney(perMonth)} a month` : 'Leave empty if it’s not a bill'}>
           <input type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
-        {link && (
-          <Field label="Plan name" hint="Optional, e.g. Pro">
-            <input value={plan} placeholder="—" onChange={(e) => setPlan(e.target.value)} />
-          </Field>
-        )}
         <Field label="Ends" hint="Optional — warns you before it runs out">
           <input type="date" value={until} min={start} onChange={(e) => setUntil(e.target.value)} />
         </Field>
@@ -149,7 +135,7 @@ export function RepeatForm({ today, onDone, from }: { today: ISODate; onDone: ()
           Cancel
         </button>
         <button className="btn primary" disabled={!ok} onClick={save}>
-          <Plus size={14} /> {link ? 'Resubscribe' : 'Add repeat'}
+          <Plus size={14} /> Add repeat
         </button>
       </div>
     </div>

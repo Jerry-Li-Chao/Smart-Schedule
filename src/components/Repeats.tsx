@@ -4,8 +4,7 @@ import type { Importance, ISODate, Task } from '../types';
 import { S, useStore } from '../store';
 import { addDays, addMonths, diffDays, fmtDay, relDay } from '../lib/date';
 import { describeRecurrence, occurrenceNumber } from '../lib/recurrence';
-import { activeBills, chainKey, chains, chainSpent, chargesBetween, monthlyCost, pastRepeats, repeatInfos, type Cadence, type Chain, type PastRepeat, type RepeatInfo } from '../lib/repeats';
-import { PlanActions, PlanHistory, priceLabel } from './PlanHistory';
+import { activeBills, chargesBetween, monthlyCost, pastRepeats, repeatInfos, type Cadence, type PastRepeat, type RepeatInfo } from '../lib/repeats';
 import { fmtMoney } from '../lib/money';
 import { cls } from '../lib/id';
 import { setItemStatus, updateTask } from '../actions';
@@ -28,7 +27,6 @@ export function Repeats({ today }: { today: ISODate }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [form, setForm] = useState<false | true | { task: Task; start: ISODate }>(false);
   const all = useMemo(() => repeatInfos(entities, today), [entities, today]);
-  const chainMap = useMemo(() => chains(entities, today), [entities, today]);
   const live = all.filter((r) => !r.ended);
   const past = useMemo(() => pastRepeats(entities, today), [entities, today]);
   const nudges = past.filter((p) => p.soonIn !== undefined);
@@ -44,9 +42,7 @@ export function Repeats({ today }: { today: ISODate }) {
     setPurging(null);
   };
   const again = (p: PastRepeat) => {
-    // a subscription you resubscribe to starts now; a seasonal repeat comes back on its anniversary
-    const resub = !!p.task.cost && p.how === 'ended';
-    setForm({ task: p.task, start: resub || p.again < today ? today : p.again });
+    setForm({ task: p.task, start: p.again < today ? today : p.again });
     document.querySelector('.repeats')?.scrollTo({ top: 0, behavior: 'smooth' });
   };
   const weekEnd = useMemo(() => {
@@ -138,7 +134,7 @@ export function Repeats({ today }: { today: ISODate }) {
             </h3>
             <div className="rp-grid">
               {list.map((r) => (
-                <RepeatCard key={r.task.id} r={r} chain={chainMap.get(chainKey(r.task))} today={today} />
+                <RepeatCard key={r.task.id} r={r} today={today} />
               ))}
             </div>
           </section>
@@ -156,17 +152,15 @@ export function Repeats({ today }: { today: ISODate }) {
                 <div className="pr-main">
                   <b>{p.task.title.replace(/\s+#\s*$/, '')}</b>
                   <span className="muted small">
-                    {describeRecurrence({ ...p.task.recurrence!, until: undefined }, p.task.date!)}
-                    {p.task.cost?.amount ? ` · ${p.task.plan ? `${p.task.plan} · ` : ''}${fmtMoney(p.task.cost.amount)}` : ''}
-                    {p.periods.length > 1 && ` · ${p.periods.length} periods`}
-                    {p.task.cost && ` · spent ${fmtMoney(chainSpent(p.periods, p.from, p.to))}`}
+                    {describeRecurrence({ ...p.task.recurrence!, until: undefined }, p.from)}
+                    {p.task.cost?.amount ? ` · ${fmtMoney(p.task.cost.amount)}` : ''}
                   </span>
                 </div>
                 <span className="pr-ran small muted">
                   {fmtDay(p.from, today)} – {fmtDay(p.to, today)} · {p.how}
                 </span>
-                <button className="btn tiny" title={p.how === 'ended' ? 'Start it again — added to the same history' : 'Start it again'} onClick={() => again(p)}>
-                  <RotateCcw size={12} /> {p.task.cost && p.how === 'ended' ? 'Resubscribe' : 'Add again'}
+                <button className="btn tiny" onClick={() => again(p)}>
+                  <RotateCcw size={12} /> Add again
                 </button>
                 {purging === p.task.id ? (
                   <span className="pr-confirm">
@@ -191,7 +185,7 @@ export function Repeats({ today }: { today: ISODate }) {
   );
 }
 
-function RepeatCard({ r, chain, today }: { r: RepeatInfo; chain?: Chain; today: ISODate }) {
+function RepeatCard({ r, today }: { r: RepeatInfo; today: ISODate }) {
   const t = r.task;
   const until = t.recurrence!.until;
   const open = () => S().setUI({ selectedId: t.id, occDate: r.next ?? undefined });
@@ -232,7 +226,6 @@ function RepeatCard({ r, chain, today }: { r: RepeatInfo; chain?: Chain; today: 
       </div>
       {!!t.cost?.amount && (
         <div className="rp-cost">
-          {t.plan && <span className="rp-plan">{t.plan}</span>}
           <b>{fmtMoney(t.cost.amount)}</b> each time
           {t.recurrence!.freq !== 'monthly' || t.recurrence!.interval > 1 ? <span className="muted"> · ≈ {fmtMoney(monthlyCost(t))}/mo</span> : null}
         </div>
@@ -275,23 +268,7 @@ function RepeatCard({ r, chain, today }: { r: RepeatInfo; chain?: Chain; today: 
         </div>
       )}
 
-      {r.endsIn !== undefined && chain?.upcoming && chain.upcoming !== t ? (
-        <div className="rp-alert renew" onClick={(e) => e.stopPropagation()}>
-          <Hourglass size={12} />
-          <span>
-            Switches to {chain.upcoming.plan ? `${chain.upcoming.plan}, ` : ''}
-            {priceLabel(chain.upcoming)} on {fmtDay(chain.upcoming.date!, today)}
-          </span>
-        </div>
-      ) : r.endsIn !== undefined && t.cost ? (
-        <div className="rp-alert renew" onClick={(e) => e.stopPropagation()}>
-          <Hourglass size={12} />
-          <span>Stops after {fmtDay(until!, today)}{r.endsIn === 0 ? ' (today)' : ''}</span>
-          <button className="link-btn" onClick={() => updateTask(t.id, { recurrence: { ...t.recurrence!, until: undefined } }, `“${t.title}” keeps running`)}>
-            Keep it running
-          </button>
-        </div>
-      ) : r.endsIn !== undefined && (
+      {r.endsIn !== undefined && (
         <div className="rp-alert renew" onClick={(e) => e.stopPropagation()}>
           <Hourglass size={12} />
           <span>Ends {r.endsIn === 0 ? 'today' : `in ${r.endsIn} day${r.endsIn > 1 ? 's' : ''}`} — renew?</span>
@@ -302,11 +279,8 @@ function RepeatCard({ r, chain, today }: { r: RepeatInfo; chain?: Chain; today: 
       {until && r.endsIn === undefined && !r.ended && (
         <div className="rp-until">
           <CalendarClock size={11} /> until {fmtDay(until, today)}
-          {chain?.upcoming && chain.upcoming !== t && ` · then ${chain.upcoming.plan ? `${chain.upcoming.plan}, ` : ''}${priceLabel(chain.upcoming)}`}
         </div>
       )}
-      {chain && (chain.periods.length > 1 || (chain.upcoming && chain.upcoming !== t)) && <PlanHistory chain={chain} today={today} />}
-      {chain && !!t.cost && !t.allDay && <PlanActions key={t.id} t={t} chain={chain} today={today} />}
     </div>
   );
 }

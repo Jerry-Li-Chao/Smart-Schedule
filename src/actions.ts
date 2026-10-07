@@ -305,7 +305,7 @@ export interface PlanChange {
   from: ISODate;
   amount: number;
   plan?: string;
-  /** the new period's schedule, end date included (default: the same one, restarting on `from`, open-ended) */
+  /** a different schedule for the new period (default: the same one, restarting on `from`) */
   recurrence?: Recurrence;
   /** what was actually billed on `from`, when it isn't the new price (a prorated upgrade) */
   oneOff?: number;
@@ -313,7 +313,7 @@ export interface PlanChange {
 
 /** A new period of `prev`'s subscription. */
 function newPeriod(prev: Task, c: PlanChange): Task {
-  const r = c.recurrence ?? { ...prev.recurrence!, until: undefined };
+  const r = c.recurrence ?? prev.recurrence!;
   return newTask({
     title: prev.title,
     notes: prev.notes,
@@ -325,7 +325,7 @@ function newPeriod(prev: Task, c: PlanChange): Task {
     chainId: chainKey(prev),
     plan: c.plan?.trim() || undefined,
     // weekly on fixed weekdays keeps them; everything else restarts its cycle on the new start day
-    recurrence: { ...r },
+    recurrence: { ...r, until: undefined },
     cost: { amount: c.amount, ...(prev.cost?.autopay ? { autopay: true } : {}), ...(c.oneOff !== undefined ? { charged: { [c.from]: c.oneOff } } : {}) },
   });
 }
