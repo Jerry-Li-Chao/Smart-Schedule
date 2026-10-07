@@ -1,4 +1,5 @@
-import type { DayItem, Entity, ISODate, Project, Status, Task, TrackerEntry } from './types';
+import type { DayItem, Entity, ISODate, Project, Recurrence, Status, Task, TrackerEntry } from './types';
+import { chainKey } from './lib/repeats';
 import { S, useStore } from './store';
 import { uid } from './lib/id';
 import { addDays, diffDays, fmtDay, localDateTime, parseLocalDateTime, todayISO } from './lib/date';
@@ -149,7 +150,9 @@ export function updateTask(id: string, patch: Partial<Task>, label?: string) {
   }
   if ('remindAt' in patch) next.remindFired = false;
   if (patch.status && patch.status !== t.status) next.doneAt = patch.status === 'done' ? Date.now() : undefined;
-  S().commit(label ?? `Edited “${t.title}”`, [next]);
+  // a subscription's periods share one name
+  const siblings = patch.title !== undefined && t.recurrence && next.title !== t.title ? chainSiblings(t).map((x) => ({ ...x, title: next.title })) : [];
+  S().commit(label ?? `Edited “${t.title}”`, [next, ...siblings]);
   if (patch.title !== undefined && next.title !== t.title) askIfQuestion(getTask(id) ?? next);
   if (patch.status === 'done' && t.status !== 'done') promptNextSteps(next);
 }
@@ -270,7 +273,15 @@ export function requestDelete(id: string, occDate?: ISODate) {
 }
 
 export function deleteRepeating(series: Task, date: ISODate | undefined, scope: 'one' | 'future' | 'all') {
-  if (scope === 'all' || !date || (scope === 'future' && date <= series.date!)) return deleteEntity(series.id);
+  if (scope === 'all' || !date || (scope === 'future' && date <= series.date!)) {
+    // "all" means the whole subscription, every period of it
+    const rest = scope === 'all' ? chainSiblings(series) : [];
+    if (!rest.length) return deleteEntity(series.id);
+    S().commit(`Deleted “${series.title}”`, [series, ...rest].map((x) => ({ ...x, deleted: true })));
+    S().toast(`Deleted “${series.title}” (all ${rest.length + 1} periods)`, [{ label: 'Undo', run: () => S().undo() }]);
+    if (S().ui.selectedId === series.id) S().setUI({ selectedId: undefined });
+    return;
+  }
   if (scope === 'one') {
     S().commit(`Deleted “${series.title}” on ${fmtDay(date)}`, [{ ...series, completions: { ...(series.completions ?? {}), [date]: 'deleted' } }]);
     S().toast(`Deleted “${series.title}” on ${fmtDay(date)} only`, [{ label: 'Undo', run: () => S().undo() }]);
@@ -279,6 +290,80 @@ export function deleteRepeating(series: Task, date: ISODate | undefined, scope: 
     S().toast(`“${series.title}” no longer repeats from ${fmtDay(date)}`, [{ label: 'Undo', run: () => S().undo() }]);
   }
   if (S().ui.selectedId === series.id) S().setUI({ selectedId: undefined });
+}
+
+// ---------- subscriptions that change: plan changes, pauses, resubscribing ----------
+
+/** The other periods of the same subscription. */
+function chainSiblings(t: Task): Task[] {
+  const k = chainKey(t);
+  return tasks().filter((x) => x.id !== t.id && x.recurrence && chainKey(x) === k);
+}
+
+export interface PlanChange {
+  /** first day of the new period */
+  from: ISODate;
+  amount: number;
+  plan?: string;
+  /** a different schedule for the new period (default: the same one, restarting on `from`) */
+  recurrence?: Recurrence;
+  /** what was actually billed on `from`, when it isn't the new price (a prorated upgrade) */
+  oneOff?: number;
+}
+
+/** A new period of `prev`'s subscription. */
+function newPeriod(prev: Task, c: PlanChange): Task {
+  const r = c.recurrence ?? prev.recurrence!;
+  return newTask({
+    title: prev.title,
+    notes: prev.notes,
+    importance: prev.importance,
+    color: prev.color,
+    projectId: prev.projectId,
+    time: prev.time,
+    date: c.from,
+    chainId: chainKey(prev),
+    plan: c.plan?.trim() || undefined,
+    // weekly on fixed weekdays keeps them; everything else restarts its cycle on the new start day
+    recurrence: { ...r, until: undefined },
+    cost: { amount: c.amount, ...(prev.cost?.autopay ? { autopay: true } : {}), ...(c.oneOff !== undefined ? { charged: { [c.from]: c.oneOff } } : {}) },
+  });
+}
+
+/** Switch plans from a day on: the current period ends the day before, a new one starts — past charges keep their price. */
+export function changePlan(cur: Task, c: PlanChange) {
+  const label = `“${cur.title}” → ${c.plan?.trim() ? `${c.plan.trim()}, ` : ''}${c.amount} from ${fmtDay(c.from)}`;
+  if (c.from <= cur.date!) {
+    // the change starts when this period does: just edit it
+    const charged = { ...(cur.cost?.charged ?? {}) };
+    if (c.oneOff !== undefined) charged[c.from] = c.oneOff;
+    else delete charged[c.from];
+    S().commit(label, [{ ...cur, plan: c.plan?.trim() || undefined, recurrence: c.recurrence ? { ...c.recurrence, until: cur.recurrence!.until } : cur.recurrence, cost: { ...cur.cost, amount: c.amount, ...(Object.keys(charged).length ? { charged } : { charged: undefined }) } }]);
+  } else {
+    S().commit(label, [{ ...cur, recurrence: { ...cur.recurrence!, until: addDays(c.from, -1) } }, newPeriod(cur, c)]);
+  }
+  S().toast(`Plan changed from ${fmtDay(c.from)} — earlier charges keep their price`, [{ label: 'Undo', run: () => S().undo() }]);
+}
+
+/** Cancel or pause: `lastDay` is the last day it's paid for. Resubscribe later from Past repeats. */
+export function pausePlan(cur: Task, lastDay: ISODate) {
+  S().commit(`Paused “${cur.title}”`, [{ ...cur, recurrence: { ...cur.recurrence!, until: lastDay } }]);
+  S().toast(`“${cur.title}” paused after ${fmtDay(lastDay)} — resubscribe any time from Past repeats`, [{ label: 'Undo', run: () => S().undo() }]);
+}
+
+/** Start a paused subscription again: a new period of the same chain, billing from `from`. */
+export function resubscribe(last: Task, c: PlanChange) {
+  const p = newPeriod(last, c);
+  S().commit(`Resubscribed “${last.title}”`, [p]);
+  S().toast(`Resubscribed “${last.title}” from ${fmtDay(c.from)}`, [{ label: 'Undo', run: () => S().undo() }]);
+  return p;
+}
+
+/** Drop a scheduled (not yet started) period and let the one before it keep running. */
+export function cancelScheduled(upcoming: Task, prev: Task | undefined) {
+  const changes: Entity[] = [{ ...upcoming, deleted: true }];
+  if (prev && prev.recurrence?.until === addDays(upcoming.date!, -1)) changes.push({ ...prev, recurrence: { ...prev.recurrence, until: undefined } });
+  S().commit(`Cancelled the change to “${upcoming.title}”`, changes);
 }
 
 // ---------- multi-select ----------

@@ -5,6 +5,67 @@ import { occursOn } from './recurrence';
 export type Cadence = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type OccState = 'done' | 'dropped' | 'missed' | 'open';
 
+// ---------- chains: a subscription's periods (price changes, pauses) ----------
+
+export const chainKey = (t: Task) => t.chainId ?? t.id;
+
+export interface Chain {
+  key: string;
+  /** every period, oldest first */
+  periods: Task[];
+  /** the period running today */
+  current?: Task;
+  /** a period that starts after today (a scheduled plan change, or resubscribing later) */
+  upcoming?: Task;
+  /** the one that stands for the chain: current, else upcoming, else the latest */
+  rep: Task;
+  /** no period runs today or later: cancelled or paused */
+  paused: boolean;
+}
+
+const endOf = (t: Task) => t.recurrence?.until;
+
+/** All repeats grouped into chains. */
+export function chains(entities: Record<string, Entity>, today: ISODate): Map<string, Chain> {
+  const groups = new Map<string, Task[]>();
+  for (const e of Object.values(entities)) {
+    if (e.type !== 'task' || e.deleted || !e.recurrence || !e.date) continue;
+    const k = chainKey(e);
+    groups.set(k, [...(groups.get(k) ?? []), e]);
+  }
+  const out = new Map<string, Chain>();
+  for (const [key, list] of groups) {
+    const periods = list.sort((a, b) => a.date!.localeCompare(b.date!));
+    const current = periods.find((p) => p.date! <= today && !(endOf(p) && endOf(p)! < today));
+    const upcoming = periods.find((p) => p.date! > today);
+    const rep = current ?? upcoming ?? periods[periods.length - 1];
+    out.set(key, { key, periods, current, upcoming, rep, paused: !current && !upcoming });
+  }
+  return out;
+}
+
+/** The chain a repeat belongs to (a chain of one when it has no siblings). */
+export function chainOf(entities: Record<string, Entity>, t: Task, today: ISODate): Chain {
+  return chains(entities, today).get(chainKey(t)) ?? { key: chainKey(t), periods: [t], rep: t, paused: false };
+}
+
+/** What one occurrence actually cost: the one-off amount if one was recorded, else the period's price. */
+export const chargeOn = (t: Task, d: ISODate) => t.cost?.charged?.[d] ?? t.cost?.amount ?? 0;
+
+/** What a chain actually charged between two days (inclusive): each period at its own price, gaps free. */
+export function chainSpent(periods: Task[], from: ISODate, to: ISODate): number {
+  let sum = 0;
+  for (const p of periods) {
+    if (!p.cost?.amount && !p.cost?.charged) continue;
+    const end = endOf(p) && endOf(p)! < to ? endOf(p)! : to;
+    for (let d = from < p.date! ? p.date! : from; d <= end; d = addDays(d, 1)) {
+      const s = p.completions?.[d];
+      if (s !== 'deleted' && s !== 'moved' && s !== 'dropped' && occursOn(p.recurrence!, p.date!, d)) sum += chargeOn(p, d);
+    }
+  }
+  return sum;
+}
+
 export interface RepeatInfo {
   task: Task;
   cadence: Cadence;
@@ -31,12 +92,8 @@ const ENDING_SOON = 45; // days
 
 /** Every repeating task, with what's next and how it has been going. */
 export function repeatInfos(entities: Record<string, Entity>, today: ISODate): RepeatInfo[] {
-  const out: RepeatInfo[] = [];
-  for (const e of Object.values(entities)) {
-    if (e.type !== 'task' || e.deleted || !e.recurrence || !e.date) continue;
-    out.push(repeatInfo(e, today));
-  }
-  return out;
+  // one card per chain: the period running now (or the next one, or the last one)
+  return [...chains(entities, today).values()].map((c) => repeatInfo(c.rep, today));
 }
 
 export function repeatInfo(t: Task, today: ISODate): RepeatInfo {
@@ -119,17 +176,15 @@ export function chargesBetween(entities: Record<string, Entity>, from: ISODate, 
     if (e.type !== 'task' || e.deleted || !e.recurrence || !e.date || !e.cost?.amount) continue;
     for (let d = from < e.date ? e.date : from; d <= to; d = addDays(d, 1)) {
       const s = e.completions?.[d];
-      if (s !== 'deleted' && s !== 'moved' && s !== 'dropped' && occursOn(e.recurrence, e.date, d)) out.push({ date: d, task: e, amount: e.cost.amount });
+      if (s !== 'deleted' && s !== 'moved' && s !== 'dropped' && occursOn(e.recurrence, e.date, d)) out.push({ date: d, task: e, amount: chargeOn(e, d) });
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || b.amount - a.amount);
 }
 
-/** Bills still running (not ended) — the ones that make up the monthly total. */
+/** Bills still running (not ended) — the ones that make up the monthly total. One per chain: the period that applies now. */
 export const activeBills = (entities: Record<string, Entity>, today: ISODate) =>
-  Object.values(entities).filter(
-    (e): e is Task => e.type === 'task' && !e.deleted && !!e.recurrence && !!e.date && !!e.cost?.amount && !(e.recurrence.until && e.recurrence.until < today),
-  );
+  [...chains(entities, today).values()].map((c) => c.rep).filter((t) => !!t.cost?.amount && !(t.recurrence!.until && t.recurrence!.until < today));
 
 // ---------- history: repeats that ended or were deleted ----------
 
@@ -139,6 +194,8 @@ export interface PastRepeat {
   from: ISODate;
   to: ISODate;
   how: 'ended' | 'deleted';
+  /** every period of its chain, oldest first (one for a plain repeat) */
+  periods: Task[];
   /** the same start date, the next time it comes round (for "add it again") */
   again: ISODate;
   /** days until `again` — set when it's coming up soon (a seasonal nudge) */
@@ -162,6 +219,8 @@ export function pastRepeats(entities: Record<string, Entity>, today: ISODate): P
       .filter((e): e is Task => e.type === 'task' && !e.deleted && !!e.recurrence && !(e.recurrence.until && e.recurrence.until < today))
       .map((t) => t.title.trim().toLowerCase()),
   );
+  const all = Object.values(entities).filter((e): e is Task => e.type === 'task' && !!e.recurrence && !!e.date && !e.purged);
+  const periodsOf = (t: Task) => all.filter((e) => chainKey(e) === chainKey(t) && e.deleted === t.deleted).sort((a, b) => a.date!.localeCompare(b.date!));
   const best = new Map<string, PastRepeat>();
   for (const e of Object.values(entities)) {
     if (e.type !== 'task' || !e.recurrence || !e.date || e.purged) continue;
@@ -172,7 +231,9 @@ export function pastRepeats(entities: Record<string, Entity>, today: ISODate): P
     const to = ended ? e.recurrence.until! : new Date(e.updatedAt).toISOString().slice(0, 10);
     const again = nextAnniversary(e.date, today);
     const gap = diffDays(today, again);
-    const p: PastRepeat = { task: e, from: e.date, to: to < e.date ? e.date : to, how: e.deleted ? 'deleted' : 'ended', again, ...(gap <= SEASON_NUDGE ? { soonIn: gap } : {}) };
+    const periods = periodsOf(e);
+    const first = periods[0]?.date ?? e.date;
+    const p: PastRepeat = { task: e, from: first < e.date ? first : e.date, to: to < e.date ? e.date : to, how: e.deleted ? 'deleted' : 'ended', again, periods, ...(gap <= SEASON_NUDGE ? { soonIn: gap } : {}) };
     const prev = best.get(key);
     if (!prev || p.to > prev.to) best.set(key, p);
   }
